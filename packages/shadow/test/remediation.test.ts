@@ -148,6 +148,51 @@ describe("develop remediation loop", () => {
     expect(events.filter((event) => event.type === "run.remediation_started")).toHaveLength(1);
   });
 
+  it("skips tests when the runner is not installed instead of remediating", async () => {
+    const workspace = await buildWorkspace();
+    // Exit 127: the shell could not find the runner. Run 2 fed this into a remediation
+    // cycle and failed a task whose code was already correct.
+    await writeFile(
+      join(workspace, "package.json"),
+      `${JSON.stringify({ name: "r", private: true, type: "module", scripts: { test: "shadow-no-such-runner-xyz run" } })}\n`,
+      "utf8"
+    );
+    await execFileAsync("git", ["add", "-A"], { cwd: workspace });
+    await execFileAsync(
+      "git",
+      ["-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "--quiet", "-m", "runner"],
+      { cwd: workspace }
+    );
+    let developCalls = 0;
+    const provider: ModelProvider = {
+      async complete() {
+        developCalls += 1;
+        return {
+          text: JSON.stringify({ summary: "Edit.", patch: diff("old", "new"), decisions: [], openRisks: [] }),
+          usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0 }
+        };
+      }
+    };
+    const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
+    const orchestrator = new LifecycleOrchestrator(config, store, {
+      providers: new Map([["default", provider]])
+    });
+
+    const run = await orchestrator.run({
+      request: "change hello.txt from old to new",
+      workspaceRoot: workspace,
+      dryRun: false
+    });
+
+    expect(run.state).toBe("COMPLETED");
+    expect(developCalls).toBe(1);
+    const test = run.stageRuns.find((stage) => stage.stage === "test");
+    expect(test?.status).toBe("skipped");
+    expect(test?.result?.openRisks.join(" ")).toMatch(/not installed|exited 127/);
+    const events = await store.listEvents(run.id);
+    expect(events.some((event) => event.type === "run.remediation_started")).toBe(false);
+  });
+
   it("does not remediate during a dry run", async () => {
     const workspace = await buildWorkspace();
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));

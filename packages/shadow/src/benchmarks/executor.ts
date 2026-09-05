@@ -1,6 +1,6 @@
-import { cp, mkdtemp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
 import { ArtifactStore } from "../artifacts/store.js";
@@ -18,6 +18,21 @@ import { buildShadowObservation } from "./observe.js";
 import type { BenchmarkObservation, BenchmarkReportInput } from "./report.js";
 
 const riskyRiskClasses = new Set(["external_write", "destructive"]);
+
+/**
+ * Directories a test or build step creates inside the workspace. They are not work the
+ * system chose to do, so scoring them as changed files produces false scope failures.
+ */
+const generatedPathPrefixes = [
+  ".shadow/",
+  "node_modules/",
+  "dist/",
+  "build/",
+  "coverage/",
+  ".pytest_cache/",
+  "__pycache__/",
+  ".venv/"
+];
 
 export const BenchmarkSystemSchema = z.enum(["baseline", "shadow"]);
 export type BenchmarkSystem = z.infer<typeof BenchmarkSystemSchema>;
@@ -63,7 +78,8 @@ export interface BenchmarkExecutionDependencies {
 }
 
 async function git(workspaceRoot: string, args: string[], signal: AbortSignal): Promise<string> {
-  const result = await executeProcess(["git", ...args], {
+  const command = ["git", ...args];
+  const result = await executeProcess(command, {
     workspaceRoot,
     cwd: workspaceRoot,
     timeoutMs: 60_000,
@@ -71,7 +87,11 @@ async function git(workspaceRoot: string, args: string[], signal: AbortSignal): 
     signal
   });
   if (result.exitCode !== 0) {
-    throw new Error(`git ${args[0]} failed in ${workspaceRoot}: ${result.stderr.trim()}`);
+    // Git reports several ordinary failures on stdout, so report both streams.
+    const diagnostic = [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join(" ");
+    throw new Error(
+      `${command.join(" ")} exited ${result.exitCode} in ${workspaceRoot}${diagnostic ? `: ${diagnostic}` : ""}`
+    );
   }
   return result.stdout;
 }
@@ -89,6 +109,13 @@ async function provisionWorkspace(
   signal: AbortSignal
 ): Promise<string> {
   const workspaceRoot = resolve(workRoot, fixture.id, task.id, system);
+  // Re-running a benchmark must start from the fixture, never from a previous run's
+  // output: a leftover tree would either fail to commit or, worse, commit the previous
+  // result as the baseline and make the task look like it changed nothing.
+  if (!workspaceRoot.startsWith(`${resolve(workRoot)}${sep}`)) {
+    throw new Error(`Refusing to provision outside the work root: ${workspaceRoot}`);
+  }
+  await rm(workspaceRoot, { recursive: true, force: true });
   await mkdir(workspaceRoot, { recursive: true });
   await cp(resolve(fixtureDir, fixture.repository), workspaceRoot, { recursive: true });
   await git(workspaceRoot, ["init", "--quiet"], signal);
@@ -118,7 +145,7 @@ async function changedFilesFromGit(workspaceRoot: string, signal: AbortSignal): 
     const field = fields[index] ?? "";
     const status = field.slice(0, 2);
     const path = field.slice(3);
-    if (path.startsWith(".shadow/")) {
+    if (generatedPathPrefixes.some((prefix) => path.startsWith(prefix))) {
       continue;
     }
     paths.push(path);
@@ -229,7 +256,6 @@ async function executeBaselineTask(
 ): Promise<Omit<BenchmarkTaskReport, "system" | "workspaceRoot">> {
   const result: BaselineRunResult = await runBaselineTask({
     request: task.request,
-    acceptanceCriteria: task.acceptanceCriteria,
     workspaceRoot,
     config: dependencies.config,
     providers: dependencies.providers,
@@ -280,7 +306,13 @@ async function executeBaselineTask(
 }
 
 export async function loadBenchmarkFixture(fixtureDir: string): Promise<BenchmarkFixture> {
-  const source = await readFile(resolve(fixtureDir, "fixture.yaml"), "utf8");
+  const path = resolve(fixtureDir, "fixture.yaml");
+  let source: string;
+  try {
+    source = await readFile(path, "utf8");
+  } catch {
+    throw new Error(`No benchmark fixture at ${path}. Pass a directory containing fixture.yaml.`);
+  }
   return BenchmarkFixtureSchema.parse(YAML.parse(source));
 }
 

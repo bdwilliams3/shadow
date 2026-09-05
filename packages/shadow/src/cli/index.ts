@@ -223,6 +223,17 @@ async function runBenchmark(
     console.error(diagnostic);
   }
 
+  if (options.workRoot) {
+    const workRoot = resolve(workspaceRoot, options.workRoot);
+    if (workRoot === workspaceRoot || workRoot.startsWith(`${workspaceRoot}/`)) {
+      console.error(
+        `Warning: ${workRoot} is inside the current project. Provisioned workspaces will ` +
+          "resolve node_modules and tooling from it, so results are not hermetic and may " +
+          "not reproduce elsewhere. Prefer a work root outside the project."
+      );
+    }
+  }
+
   const execution = await executeBenchmark(
     {
       benchmarkId: options.benchmarkId,
@@ -546,8 +557,14 @@ program
     }
   });
 
-if (process.argv.length <= 2) {
-  await interactive();
-} else {
-  await program.parseAsync(process.argv);
+try {
+  if (process.argv.length <= 2) {
+    await interactive();
+  } else {
+    await program.parseAsync(process.argv);
+  }
+} catch (error) {
+  // A misconfiguration is not a crash: report the cause, not a stack trace.
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
 }

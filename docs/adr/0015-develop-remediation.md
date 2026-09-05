@@ -18,6 +18,16 @@ Develop may create files. The set of created paths is parsed from `git apply --s
 
 Deletion, symlink changes, and binary patches remain refused, as in ADR 0006.
 
+### Declining work
+
+`DevelopOutputSchema.patch` is optional, paired with a `declineReason`. Requiring a non-empty patch left the agent no way to refuse: on a request it should decline, the model was structurally forced to invent one. In the first real benchmark run this cost 8,980 tokens across two attempts on a single task that should have ended in one call — nineteen times the baseline, and enough to invert the aggregate cost comparison on its own.
+
+An empty patch with a reason returns stage status `blocked`, which ends the run with that reason rather than retrying. This is the escalate path §8 describes.
+
+### Truncated model output
+
+The provider adapter checks `finish_reason`. A response stopped at the output ceiling is reported as truncation rather than parsed as JSON, because a truncated document produced a meaningless syntax error and invited an identical retry that consumed the ceiling a second time.
+
 ## Consequences
 
 - Test and validation failures produce a bounded second attempt with evidence instead of ending the run.

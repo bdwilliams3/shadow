@@ -4,7 +4,8 @@ import type { StageName, StageTask } from "./types.js";
 
 export interface PlannedWorkflow {
   stages: StageTask[];
-  acceptanceCriteria: string[];
+  /** Run-level invariants recorded for audit. They are not the task's acceptance criteria. */
+  invariants: string[];
   risks: string[];
 }
 
@@ -28,7 +29,12 @@ export function planWorkflow(
         : ["plan", "develop", "test", "validate"];
 
   const enabled = desiredStages.filter((stage) => config.lifecycle.enabledStages.includes(stage));
-  const acceptanceCriteria = [
+  // These describe Shadow, not the user's change. Handing them to a model as the task's
+  // acceptance criteria made it decline ordinary edits for lacking "orchestration,
+  // persistence, budgeting, and policy-evaluation components". Real per-task criteria
+  // require a model-backed Plan stage, which does not exist yet; until then stage tasks
+  // carry none and agents receive only the request.
+  const invariants = [
     "The requested work is represented as a durable run.",
     "Each selected lifecycle stage records a structured result.",
     "Token and cost budgets are checked before model-backed work.",
@@ -67,11 +73,11 @@ export function planWorkflow(
                   ? ["context.select", "context.verify", "patch.check", "patch.apply"]
                 : [],
       writePermissions: (stage === "develop" || stage === "deploy" || stage === "document") && !dryRun,
-      acceptanceCriteria,
+      acceptanceCriteria: [],
       budget: config.budgets.stage,
       retryCount: 0
     })),
-    acceptanceCriteria,
+    invariants,
     risks
   };
 }

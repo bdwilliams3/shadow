@@ -92,7 +92,7 @@ export class LifecycleOrchestrator {
     }));
     run = await this.transition(run, "PLANNED", {
       stages: planned.stages.map((stage) => stage.stage),
-      acceptanceCriteria: planned.acceptanceCriteria
+      invariants: planned.invariants
     });
 
     return this.execute(run);

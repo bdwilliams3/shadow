@@ -7,7 +7,9 @@ export const defaultConfig: ShadowConfig = {
       kind: "openai-compatible",
       baseUrl: "https://api.openai.com/v1",
       apiKeyEnv: "OPENAI_API_KEY",
-      structuredOutput: true
+      structuredOutput: true,
+      maxCompletionTokensParam: true,
+      requestTimeoutMs: 120_000
     }
   },
   models: {

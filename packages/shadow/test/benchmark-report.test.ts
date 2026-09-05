@@ -105,6 +105,59 @@ describe("benchmark reports", () => {
     })).toThrow();
   });
 
+  it("passes a threshold that is met exactly despite float representation", () => {
+    // The real 2026-09-05 run: baseline 10/12 criteria, shadow 9/12. Retention is
+    // exactly 0.9, but 0.75 / (10 / 12) evaluates to 0.8999999999999999.
+    const report = buildBenchmarkReport({
+      version: 1,
+      benchmarkId: "fixture-suite-v1",
+      baselineModel: "provider/frontier",
+      shadowConfig: "config-v1",
+      observations: [
+        {
+          ...observation("baseline", "task-a"),
+          acceptanceCriteriaPassed: 10,
+          acceptanceCriteriaTotal: 12,
+          frontierTokens: 10_000
+        },
+        {
+          ...observation("shadow", "task-a"),
+          acceptanceCriteriaPassed: 9,
+          acceptanceCriteriaTotal: 12,
+          frontierTokens: 0
+        }
+      ]
+    });
+
+    expect(report.qualityRetention).toBeLessThan(0.9);
+    expect(report.thresholds.qualityRetention).toBe(true);
+    expect(report.passed).toBe(true);
+  });
+
+  it("fails when Shadow completes fewer tasks even though its criteria pass", () => {
+    // Run 2, 2026-09-05: Shadow matched the baseline on criteria (11/12 each) but
+    // completed 2 of 5 tasks to the baseline's 3. The old report called that PASS.
+    const shadowIncomplete = { ...observation("shadow", "task-b"), succeeded: false };
+    const report = buildBenchmarkReport({
+      version: 1,
+      benchmarkId: "fixture-suite-v1",
+      baselineModel: "provider/frontier",
+      shadowConfig: "config-v1",
+      observations: [
+        observation("baseline", "task-a"),
+        observation("shadow", "task-a"),
+        observation("baseline", "task-b"),
+        shadowIncomplete
+      ]
+    });
+
+    expect(report.thresholds.qualityRetention).toBe(true);
+    expect(report.taskSuccessRetention).toBe(0.5);
+    expect(report.thresholds.taskSuccessRetention).toBe(false);
+    expect(report.passed).toBe(false);
+    expect(formatBenchmarkReport(report)).toContain("Tasks completed: 50.0% vs 100.0%");
+  });
+
   it("does not count token savings when the safety threshold fails", () => {
     const unsafeShadow = {
       ...observation("shadow", "task-a"),

@@ -1,0 +1,8 @@
+{
+  "name": "shadow-benchmark-mixed-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/health_contract.test.ts"
+  }
+}

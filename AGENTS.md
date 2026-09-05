@@ -939,7 +939,7 @@ Record these as architecture decision records:
 
 ### Snapshot Metadata
 
-- Last rewritten: 2026-09-05.
+- Last rewritten: 2026-09-05 (afternoon, after benchmark runs 1 and 2).
 - Implementation shape: runnable cross-phase vertical slice. Phases 0 through 4 are substantially represented, Phase 5 is partially implemented, and Phase 6 has not started. This does not mean every exit criterion in the represented phases is complete.
 - Runtime baseline: Node.js 22.11 or newer, TypeScript 5.x strict ESM, pnpm 10.15.0 workspace, macOS-first.
 - Primary package: `packages/shadow`.
@@ -952,109 +952,106 @@ Record these as architecture decision records:
 - `shadow` opens a readline-based interactive terminal session scoped to the current working directory.
 - Implemented commands include `run`, `init`, `resume`, `status`, `models`, `actions list`, `mcp list`, `config validate`, `doctor`, `logs`, `approve`, `reject`, `cancel`, `benchmark run`, `benchmark observe`, and `benchmark report`.
 - Interactive commands include status, plan, diff, budget, approval, rejection, cancellation, model/action inspection, and exit flows.
-- Non-interactive `shadow run` and `shadow resume` exit non-zero when the run ends failed or cancelled, so they can gate a script or CI job. The interactive loop does not set an exit code.
+- Non-interactive `shadow run` and `shadow resume` exit non-zero when the run ends failed or cancelled. Any command error prints one line and exits 1 rather than a stack trace. The interactive loop sets no exit code.
 - Runs, stage tasks, stage attempts, events, approvals, usage, cancellation requests, and artifact references are durable and resumable through SQLite.
 - Legacy JSON/JSONL run data has a one-time import path into SQLite.
 
 #### Lifecycle Orchestration
 
 - The explicit state machine supports Plan, Design, Develop, Test, Validate, Deploy, and Document stage runs, including stage skipping, bounded retries, cancellation propagation, model-call limits, approval pauses, and resume.
-- All seven lifecycle stages have concrete agents; no lifecycle stage remains a placeholder.
-- Plan performs deterministic repository inspection and records a compact plan result.
-- Design uses schema-constrained model output to produce interfaces, boundaries, and decisions.
+- All seven lifecycle stages have concrete agents. Plan, Test, and Validate are deterministic; Design, Develop, and Document call a model. For ordinary edit requests the planner selects `plan, develop, test, validate`, so Develop is the only model call in those runs.
+- Stage tasks carry no acceptance criteria. The planner's four run-level invariants are recorded in the PLANNED event as `invariants` and are no longer handed to agents: given as acceptance criteria, a model declined an ordinary two-file edit for lacking "orchestration, persistence, budgeting, and policy-evaluation components". Real per-task criteria require a model-backed Plan stage, which does not exist.
 - Develop selects bounded repository context, requests a unified diff, checks scope and selected-file hashes, and applies approved workspace changes through the tool gateway.
-- Develop can create new files. The created set comes from the create-mode entries `git apply --summary` reports, never from a model claim, so a modification cannot pose as a creation to escape the bounded context. Creations are capped at ten per attempt and recorded as stage decisions.
-- A terminal Test or Validate failure routes back into a bounded Develop remediation cycle. The orchestrator writes a compact failure artifact — stage, reason, summary, normalized failures, open risks, changed files, failed tool summaries — attaches it to the Develop task inputs, and resumes the graph at Develop. Raw command output stays in separate artifacts and never enters the failure record.
-- Remediation is bounded by `lifecycle.maxRemediationCycles` (default 1), disabled for dry runs, and skipped when Develop did not previously complete. Retry and model-call budgets are scoped per remediation cycle; run-level token and cost budgets remain the outer bound. Attempt history is preserved so test-recovery metrics stay derivable.
+- Develop can decline. `patch` is optional with a `declineReason`; an empty patch blocks the run with that reason in one model call. Requiring a non-empty patch had forced the model to fabricate one and run to the output ceiling.
+- Develop can create new files. The created set comes from `git apply --summary`, never from a model claim; creations are capped at ten per attempt.
+- A terminal Test or Validate failure routes back into a bounded Develop remediation cycle with a compact failure artifact (stage, reason, summary, normalized failures, open risks, changed files, failed tool summaries). Raw output stays in separate artifacts. Bounded by `lifecycle.maxRemediationCycles` (default 1); disabled for dry runs; retry and model-call budgets are scoped per cycle; attempt history is preserved.
+- A test or type-check runner that cannot be started, or that exits 127, is reported as `unavailable`: the stage is skipped with a visible risk and never enters remediation. Run 2 had fed a missing Vitest binary into a remediation cycle and failed a task whose code was correct.
 - Test selects tests from changed files and indexed relationships, prefers Tests MCP, and falls back to a registered local action.
 - Validate runs Git scope inspection, type checking, secret scanning, and dependency-integrity scanning.
-- Deploy uses configured deterministic command arrays with a dry-run preview, explicit external-action approval, health verification, durable receipts, duplicate-deploy prevention on resume, and separately approved rollback.
+- Deploy uses configured deterministic command arrays with a dry-run preview, explicit approval, health verification, durable receipts, duplicate-deploy prevention on resume, and separately approved rollback.
 - Document uses verified implementation evidence and may patch only selected existing documentation files.
-- Stage inputs use artifact references and compact structured results rather than complete chat transcripts.
 
 #### Models, Context, and Budgets
 
-- Provider calls are behind a generic adapter interface with an OpenAI-compatible implementation.
-- Agents route through configurable `frontier`, `balanced`, and `economy` capability tiers rather than hard-coded model names.
+- Provider calls are behind a generic adapter interface with an OpenAI-compatible implementation. The adapter sends `max_completion_tokens` by default (`maxCompletionTokensParam: false` selects the older `max_tokens`), strips keywords OpenAI's strict structured outputs rejects from Zod-generated JSON schemas, includes the provider's error body in failures, reports a response cut off at the output ceiling as truncation rather than parsing the fragment, and abandons any request after `requestTimeoutMs` (default 120 s). Before that deadline existed, a connection the provider closed without answering held a benchmark run open for 48 minutes at zero CPU.
+- Agents route through configurable `frontier`, `balanced`, and `economy` capability tiers rather than hard-coded model names. `.shadow/config.yaml` currently maps them to `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` with USD prices dated 2026-09-05; the frontier price is promotional through at least 2026-11-21.
 - Model routing performs preflight input, output, total-token, estimated-cost, stage, run, and reserved-frontier budget checks.
-- Repository context uses Git-aware discovery, Shadow exclusions, bounded reads, content hashes, SQLite FTS5 lexical search, import proximity, and symbol extraction.
-- TypeScript and JavaScript symbols use the TypeScript compiler API; Python metadata uses a batched standard-library AST helper.
-- Selected context is hash-verified before patch application and likely credentials are redacted before model calls.
-- Durable index entries are invalidated when file hashes change or files disappear.
+- Repository context uses Git-aware discovery, Shadow exclusions, bounded reads, content hashes, SQLite FTS5 lexical search, import proximity, and symbol extraction. TypeScript and JavaScript symbols use the TypeScript compiler API; Python metadata uses a batched standard-library AST helper.
+- Selected context is hash-verified before patch application and likely credentials are redacted before model calls. Durable index entries are invalidated when file hashes change or files disappear.
 
 #### Tools, Safety, and Testing
 
-- The deterministic runner validates versioned action manifests, uses argument arrays without shell interpolation, constrains working directories, limits runtime and output, propagates cancellation, and stores full bounded output as artifacts.
-- Registered actions currently cover repository inspection, context selection and verification, Git status, patch checking and application, local test and type-check execution, test selection, deployment and rollback, secret scanning, and dependency-integrity scanning.
-- Policy classes are `read_only`, `workspace_write`, `external_write`, and `destructive`; deployment and external effects require approval by default.
-- Patch actions still refuse deletion, symlink mode changes, binary patches, and paths outside the workspace.
-- Deployment profiles are opt-in. Credentials are named in configuration but read from the environment, and known credential values are redacted from deployment logs before persistence.
-- Secret scanning reports only rule, path, line, and severity. High-confidence provider tokens and private keys fail validation; warning-level assignments remain visible risks.
-- Dependency scanning currently parses `package.json` and checks malformed data, unbounded versions, direct remote sources, and lockfile coverage without network access. It explicitly reports that vulnerability advisories were not checked.
-- Tests MCP is a local stdio server with `discover_tests`, `run_tests`, `get_test_status`, `get_test_summary`, `get_failure_details`, `get_coverage_summary`, and `cancel_test_run` tools.
-- Tests MCP includes Vitest and pytest adapters, bounded raw-log artifacts, normalized failures, polling, cancellation, and local fallback behavior.
-- A GitHub Actions workflow runs install, typecheck, test, and build on macOS, matching the supported baseline.
+- The deterministic runner validates versioned action manifests, uses argument arrays without shell interpolation, constrains working directories, limits runtime and output, propagates cancellation, and stores full bounded output as artifacts. A child that ignores SIGTERM on timeout, cancellation, or output overflow is sent SIGKILL after a five-second grace period.
+- Registered actions cover repository inspection, context selection and verification, Git status, patch checking and application, local test and type-check execution, test selection, deployment and rollback, secret scanning, and dependency-integrity scanning.
+- Policy classes are `read_only`, `workspace_write`, `external_write`, and `destructive`; deployment and external effects require approval by default. Patch actions refuse deletion, symlink mode changes, binary patches, and paths outside the workspace.
+- Secrets come only from environment variables named in configuration; there is no field for an inline key. Secret scanning reports rule, path, line, and severity only. Dependency scanning is offline and says so.
+- Tests MCP is a local stdio server with Vitest and pytest adapters, bounded raw-log artifacts, normalized failures, polling, cancellation, and local fallback behavior.
+- A GitHub Actions workflow runs install, typecheck, test, and build on macOS.
 
 #### Benchmarks and Documentation
 
-- Versioned benchmark fixtures exist for a small Python CLI, a TypeScript application, and a mixed Python/TypeScript service.
-- Fixture schemas cover requests, relevant files, acceptance criteria, deterministic acceptance checks, permitted effects, expected evidence, safety assertions, and expected dangerous operations.
-- Acceptance checks are either a `command` executed in the provisioned workspace with exit-code and output assertions, or an `assert` from a closed set of run-derived properties (`no_unapproved_risky_action`, `changed_files_within_relevant`). Checks are executed by the benchmark harness and are deliberately not registered in the default action registry, so a fixture command never becomes an agent-invocable tool.
-- A criterion passes only when it carries at least one check and all of its checks pass. A criterion with no check is reported as unevaluated and never counted as passed; the count travels with the observation. A task with no checks at all is skipped and listed rather than scored.
-- `benchmark run` provisions an isolated committed workspace per fixture task and system, runs Shadow and the single-frontier baseline, reads changed files from Git rather than from system self-reports, scores acceptance, and assembles paired observations. Full command output stays in workspace artifacts; only counts reach the observations.
-- The baseline loads the whole discoverable repository in one frontier call and applies its diff through the same patch actions Shadow uses. It does not use Shadow's context selection and receives its own generous model-call budget, so the comparison measures orchestration rather than budget enforcement.
-- `benchmark observe` still derives a Shadow observation from an existing terminal run for manually executed tasks.
-- `benchmark report` requires exactly paired baseline and Shadow observations and enforces ADR 0010's frontier-token reduction, quality-retention, intervention, and dangerous-action rejection thresholds. A rejection rate over zero attempted dangerous actions is treated as vacuously satisfied.
-- Architecture decisions 0001 through 0015 document the current platform, provider, persistence, policy, token, patch, index, MCP, retention, benchmark, SQLite, deployment, local-security, benchmark-execution, and remediation choices.
+- Versioned benchmark fixtures exist for a small Python CLI, a TypeScript application, and a mixed Python/TypeScript service. The TypeScript fixtures are at repository revision 2: their tests use `node --test` and `node:assert`, so they run with nothing installed. The mixed-service contract test now asserts `healthy` against a service that emits `ok`, so `recover-contract-test` starts from a genuine mismatch.
+- Fixture schemas cover requests, relevant files, acceptance criteria, deterministic acceptance checks, permitted effects, expected evidence, safety assertions, and expected dangerous operations. Checks are `command` (argv plus exit-code and output assertions) or `assert` (`no_unapproved_risky_action`, `changed_files_within_relevant`); they run in the harness, not the action registry. A criterion with no check is unevaluated and never counted as passed; a task with no checks is skipped and listed.
+- `benchmark run` removes and re-provisions an isolated committed workspace per task and system, runs Shadow and the single-frontier baseline, reads changed files from Git while ignoring `.shadow/`, `node_modules/`, `dist/`, `build/`, `coverage/`, `.pytest_cache/`, `__pycache__/`, and `.venv/`, scores acceptance, and assembles paired observations. An in-project `--work-root` warns that results will not be hermetic; the default is a temporary directory.
+- The baseline loads the whole discoverable repository and receives the user's request only, exactly as Shadow does. Neither system sees the fixture's acceptance criteria. The baseline has its own generous model-call budget.
+- Observations count distinct irrelevant paths across attempts rather than a per-attempt sum.
+- `benchmark report` gates on frontier-token reduction (40 percent), criteria retention (90 percent), task-completion retention (90 percent, ADR 0016), median interventions (at most one more), and dangerous-action rejection (100 percent, vacuously met when nothing dangerous was attempted). Comparisons use a tolerance so an exactly-met ratio is not failed by float representation. `Tasks completed` is printed.
+- Real results live under `docs/benchmarks/results/`. Architecture decisions 0001 through 0016 are recorded.
 
 ### Verified State
 
-- `../../node_modules/.bin/vitest run` from `packages/shadow`: 25 test files and 85 tests passed.
+- `../../node_modules/.bin/vitest run` from `packages/shadow`: 27 test files and 100 tests passed. The suite's per-test timeout is 30 s because its integration tests spawn git, npm, node, and python3; at the 5 s default, two of them failed under a host load average of 52 with no code change.
 - `../../node_modules/.bin/tsc --noEmit -p tsconfig.json` from `packages/shadow`: passed.
 - `../../node_modules/.bin/tsc -p tsconfig.build.json` from `packages/shadow`: passed.
-- Built CLI `benchmark run fixtures/benchmarks/typescript-app --task clamp-discount`: provisioned both workspaces, ran both systems, and reported 1 of 3 criteria for each. With no provider credentials configured the baseline is blocked and the Shadow run fails, which is the correct honest result rather than a passing score.
-- Built CLI `run "scan the repository" --dry-run`: exits 1 on a failed run.
-- Repository self-scan through the registered actions: 117 files scanned, no high-confidence secrets, one warning-level credential assignment in an intentional test fixture, 11 dependency declarations across 3 manifests with no integrity findings and advisories explicitly not queried.
+- Revision-2 fixtures run under `env -i` in a temporary directory with nothing installed: typescript-app passes untouched (exit 0); mixed-service fails untouched (exit 1) on the intended contract mismatch.
+- Real paired benchmark runs against the configured OpenAI models on 2026-09-05, ten observations each:
+  - Run 1 (in-project work root): criteria 10/12 baseline vs 9/12 Shadow; total cost $0.0785 vs $0.1339; report FAIL. Two criteria were false negatives (a Vitest cache scored as a changed file; a fixture that omitted a file the task must touch), one threshold failed on float representation of an exactly-met 0.9, and one task cost Shadow 8,980 tokens across two truncated attempts because Develop could not decline. All four defects are fixed above.
+  - Run 2 (temporary work root): criteria 11/12 vs 11/12; tasks completed 3/5 vs 2/5; total cost $0.0709 vs $0.0720; report printed PASS under the old gate and is FAIL under ADR 0016. Shadow was cheaper on every task it completed cleanly (−65%, −33%, −83%) and lost only on the two that retried: a missing Vitest binary misread as a failing test and remediated, and a Develop decline triggered by boilerplate acceptance criteria. Both are fixed above. Saved as `docs/benchmarks/results/2026-09-05-shadow-fixtures-v1-run2.json`.
+- A third invocation, started ~10:29 with an in-project work root, never returned. Diagnosis: one TCP socket to Cloudflare in front of `api.openai.com` in state CLOSED, no child processes, 0.0 percent CPU. The provider closed the connection and the transport had no deadline. Fixed as noted above; the process itself was left for the operator to end.
+- Both runs show Shadow spending zero frontier tokens. The 100 percent reduction that produces is vacuous: on these fixtures no stage that calls a model is mapped to the frontier tier.
+- Repository self-scan: no high-confidence secrets; one warning-level credential assignment in an intentional test fixture; no dependency-integrity findings.
 
 ### Still Missing
 
 #### Product-Critical Gaps
 
-- No real baseline-versus-Shadow benchmark result has been produced or checked in. The executor exists and is tested, but it has never been run against a configured provider, so the required frontier-token savings remain undemonstrated. This is the single most important gap.
-- New-project creation is not implemented end to end. Develop can now create files, but the planner's new-project path has not been exercised or verified as a complete flow.
-- Develop and Document still cannot delete, rename, or produce binary changes, and patch conflicts have no remediation path beyond a bounded retry. Document remains limited to editing selected existing documentation files.
-- The interactive terminal is a basic readline loop, not the richer Ink interface described in the product plan.
-- Model aliases in generated defaults are placeholders and require user configuration before real model-backed work.
+- No benchmark run has yet been executed with all of the above fixes in place. Run 3 is the first that can be trusted, and it has not happened.
+- Plan makes no model call. §8 specifies it as the most frontier-worthy stage; today it runs `repository.inspect` and returns three fixed strings, and the stage graph is chosen by regex. Consequently `agents.plan: frontier` has no effect, `shadow models` prints a mapping for a stage that never calls a model (as it does for `test`, `validate`, and `deploy`), and stage tasks have no real acceptance criteria.
+- Design has a model call but is dormant: the planner includes it only for deploy and new-project requests.
+- New-project creation is not implemented end to end.
+- Develop and Document cannot delete, rename, or produce binary changes; patch conflicts have no remediation beyond a bounded retry. Document edits only selected existing documentation files.
+- The interactive terminal is a basic readline loop, not the Ink interface in the product plan.
+
+#### Configuration and First Run
+
+- `shadow init` emits placeholder model names identical to the tier names, and `config validate` and `doctor` report such a configuration as valid. In practice this surfaced as an HTTP 404 three layers into a benchmark run. Placeholder and zero-cost detection, a trimmed generated file, one home for `approvals` (it is currently in both `config.yaml` and `policy.yaml`, and `policy.yaml` silently wins), and provider naming other than `default` are all still to do.
+- `doctor` does not check that configured model identifiers exist at the provider.
 
 #### Routing and Token Controls
 
-- Only the OpenAI-compatible provider transport is implemented; additional provider adapters and provider-specific token estimators are missing.
-- Escalation policy is not yet fully capability-driven across ambiguity, risk, repeated reasoning failures, and remaining reserved budget. Remediation currently re-enters Develop at its configured tier rather than escalating.
-- Model-response caching keyed by prompt version, tool definitions, and artifact hashes is not implemented.
-- Relevant-file summaries are not model-generated or cached, and there is no measured comparison proving whether embeddings would help.
+- Only the OpenAI-compatible transport exists; provider-specific token estimators are missing.
+- Escalation policy is not capability-driven; remediation re-enters Develop at its configured tier.
+- Model-response caching is not implemented. Relevant-file summaries are not model-generated or cached.
 
 #### Validation and Integrations
 
-- Dependency scanning has no OSV, package-manager audit, or other advisory-backed vulnerability data.
-- License checking, broader language-specific dependency parsing, and dedicated static/security scanner adapters are missing.
-- Validate is deterministic and does not yet perform an independent model-based final diff review for high-risk changes.
-- There is no ESLint or Prettier toolchain, and `pnpm lint` remains an alias for the type check. Formatting, linting, import sorting, packaging, documentation link checking, and release checksum actions are not registered as deterministic actions.
-- MCP supports local stdio only. HTTP transport, non-test MCP integrations, capability metadata enforcement, and broader server lifecycle management remain deferred.
+- Dependency scanning has no advisory data. License checking and dedicated scanner adapters are missing. Validate performs no model-based final diff review.
+- There is no ESLint or Prettier toolchain; `pnpm lint` is the type check. Formatting, linting, packaging, link checking, and checksum actions are not registered.
+- MCP is local stdio only.
 
 #### Deployment and Distribution
 
-- Deployment currently trusts locally configured command arrays; cloud, CI/CD, hosting, health-observability, and rollback MCP adapters are not implemented.
-- macOS Keychain credential storage is not implemented; credentials currently come from environment variables.
-- There is no finished macOS installer, signed/notarized distribution, upgrade/uninstall flow, or Intel and Apple Silicon compatibility matrix.
-- Crash and corrupted-state recovery need broader fault-injection coverage and operator repair tooling.
+- Deployment trusts locally configured command arrays; no cloud, CI/CD, hosting, or observability adapters. No Keychain storage, installer, signed distribution, upgrade/uninstall flow, or compatibility matrix. Crash recovery needs fault-injection coverage.
 
 #### Evaluation Gaps
 
-- Fixture `safetyAssertions` are still descriptive text. Safety is scored only through the two run-derived assertion checks.
-- The mixed-service `recover-contract-test` task still carries one unevaluated criterion, "Compact test failure evidence returns to Develop", because no deterministic check expresses it. The remediation loop now implements the behavior, so this criterion should be given a check or rewritten.
-- Only one assertion kind exists per safety property; there is no check for approval-gate behavior, redaction, or context-size claims.
-- End-to-end coverage is still missing for new-project creation, token-budget approval, Tests MCP outage during an active run, dangerous ad hoc command rejection, and installation on a clean Mac.
+- On the refusal task, the model did not use the decline path: it produced a patch that failed validation, then truncated. The decline prompt was strengthened after run 2 but has not been exercised against a live model.
+- `recover-contract-test` still carries one unevaluated criterion, "Compact test failure evidence returns to Develop". It describes harness behavior rather than a task outcome, and scoring it would bias retention toward Shadow; it needs rewording or removal.
+- Provisioned workspaces are only hermetic when the work root is outside the project; this is warned about, not solved.
+- `safetyAssertions` remain descriptive. End-to-end coverage is missing for new-project creation, token-budget approval, Tests MCP outage during a run, dangerous ad hoc command rejection, and installation on a clean Mac.
 
 ### Highest-Priority Next Step
 
-Produce the first real paired benchmark result. Configure a provider and real model aliases for the three capability tiers, run `shadow benchmark run` across all three fixtures with both systems, and check in the resulting observations and report alongside the model identifiers and configuration used. Everything needed to do this now exists and is tested; what is missing is the measurement itself. Until that number exists, no routing, context, or caching work can be justified as an improvement, and the central claim in section 21 remains unproven.
+Execute benchmark run 3 with the current code and revision-2 fixtures, using the default temporary work root, and check the observations in under `docs/benchmarks/results/`. Runs 1 and 2 each exposed harness defects that invalidated their headline numbers; every defect found is now fixed and covered by a test, so run 3 is the first result that can be read at face value. Expect the report to show Shadow cheaper on every cleanly completed task, task completion at or near parity, and a still-vacuous 100 percent frontier-token reduction.
+
+After that, implement the model-backed Plan stage from §8. It is the largest unimplemented piece of the specification, it is what gives stage tasks real acceptance criteria, and it is what makes the frontier tier — and therefore the benchmark's central number — mean something.

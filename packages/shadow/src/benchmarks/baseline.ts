@@ -43,14 +43,13 @@ export type BaselineOutput = z.infer<typeof BaselineOutputSchema>;
 
 const baselineSystemPrompt = [
   "You are a single frontier coding model working end to end without a harness.",
-  "Implement the requested change using the supplied repository files and acceptance criteria.",
+  "Implement the requested change using the supplied repository files.",
   "Return JSON matching the supplied schema.",
   "The patch must be a standard unified Git diff with workspace-relative paths."
 ].join("\n");
 
 export interface BaselineRunOptions {
   request: string;
-  acceptanceCriteria: string[];
   workspaceRoot: string;
   config: ShadowConfig;
   providers: ReadonlyMap<string, ModelProvider>;
@@ -157,9 +156,10 @@ export async function runBaselineTask(options: BaselineRunOptions): Promise<Base
     completion = await models.completeStructured({
       tier: "frontier",
       system: baselineSystemPrompt,
+      // The request only. The fixture's acceptance criteria are the grader's, and handing
+      // them to either system would leak the test into the system under test.
       input: {
         request: options.request,
-        acceptanceCriteria: options.acceptanceCriteria,
         files
       },
       schemaName: "baseline_result_v1",

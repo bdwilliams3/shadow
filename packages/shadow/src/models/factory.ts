@@ -30,7 +30,9 @@ export function createConfiguredProviders(
       new OpenAICompatibleProvider({
         baseUrl: providerConfig.baseUrl ?? "https://api.openai.com/v1",
         apiKey,
-        structuredOutput: providerConfig.structuredOutput
+        structuredOutput: providerConfig.structuredOutput,
+        maxCompletionTokensParam: providerConfig.maxCompletionTokensParam,
+        requestTimeoutMs: providerConfig.requestTimeoutMs
       })
     );
   }

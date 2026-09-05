@@ -1,8 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { isAvailable } from "../client/health.js";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { isAvailable } from "../client/health.ts";
 
-describe("health contract", () => {
-  it("recognizes an available service", () => {
-    expect(isAvailable("ok")).toBe(true);
-  });
+test("recognizes an available service", () => {
+  assert.equal(isAvailable("healthy"), true);
 });

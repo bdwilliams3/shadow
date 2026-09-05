@@ -127,6 +127,65 @@ describe("benchmark executor", () => {
     expect(formatBenchmarkExecution(execution)).toContain("synthetic-v1/swap-hello");
   });
 
+  it("re-provisions a dirty workspace so a second run starts from the fixture", async () => {
+    const fixtureDir = await buildFixtureDir();
+    const providers = new Map([["default", scaledProvider()]]);
+    const workRoot = await mkdtemp(join(tmpdir(), "shadow-benchmark-rerun-"));
+    const options = {
+      benchmarkId: "synthetic-suite",
+      fixtureDirs: [fixtureDir],
+      taskIds: ["swap-hello"],
+      systems: ["baseline"],
+      workRoot
+    };
+
+    const first = await executeBenchmark(options, { config: defaultConfig, providers });
+    const workspaceRoot = first.taskReports[0]!.workspaceRoot;
+    expect(await readFile(join(workspaceRoot, "hello.txt"), "utf8")).toBe("new\n");
+
+    // The same work root, now holding a committed repo and the previous run's output.
+    const second = await executeBenchmark(options, { config: defaultConfig, providers });
+
+    expect(second.taskReports).toHaveLength(1);
+    expect(second.taskReports[0]?.workspaceRoot).toBe(workspaceRoot);
+    // The patch applied again, which is only possible from a clean fixture tree.
+    expect(second.taskReports[0]?.changedFiles).toEqual(["hello.txt"]);
+    expect(second.taskReports[0]?.observation.succeeded).toBe(true);
+  });
+
+  it("does not score build output a test step created as a changed file", async () => {
+    const fixtureDir = await buildFixtureDir();
+    // Stand in for the vitest cache the real run created inside the workspace.
+    await writeFile(
+      join(fixtureDir, "repo/package.json"),
+      `${JSON.stringify({
+        name: "synthetic",
+        private: true,
+        scripts: {
+          test: "node -e \"require('fs').mkdirSync('node_modules/.vite',{recursive:true});require('fs').writeFileSync('node_modules/.vite/results.json','{}')\""
+        }
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    const providers = new Map([["default", scaledProvider()]]);
+
+    const execution = await executeBenchmark(
+      {
+        benchmarkId: "synthetic-suite",
+        fixtureDirs: [fixtureDir],
+        taskIds: ["swap-hello"],
+        systems: ["shadow"]
+      },
+      { config: defaultConfig, providers }
+    );
+
+    const shadow = execution.taskReports[0]!;
+    expect(await readFile(join(shadow.workspaceRoot, "node_modules/.vite/results.json"), "utf8"))
+      .toBe("{}");
+    expect(shadow.changedFiles).toEqual(["hello.txt"]);
+    expect(shadow.acceptance.checks.find((c) => c.id === "scope-limited")?.passed).toBe(true);
+  });
+
   it("skips a task that declares no deterministic acceptance checks", async () => {
     const fixtureDir = await buildFixtureDir();
     const providers = new Map([["default", scaledProvider()]]);

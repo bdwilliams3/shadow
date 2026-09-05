@@ -13,7 +13,13 @@ export const ProviderSchema = z.object({
   kind: z.enum(["openai-compatible", "mock"]).default("openai-compatible"),
   baseUrl: z.string().url().optional(),
   apiKeyEnv: z.string().min(1).optional(),
-  structuredOutput: z.boolean().default(true)
+  structuredOutput: z.boolean().default(true),
+  // Newer OpenAI models require max_completion_tokens; set false for servers that
+  // only accept the older max_tokens parameter.
+  maxCompletionTokensParam: z.boolean().default(true),
+  // Every model request is abandoned after this long. Without it a stalled
+  // connection held a benchmark run open indefinitely at zero CPU.
+  requestTimeoutMs: z.number().int().positive().default(120_000)
 });
 
 const AgentModelMappingSchema = z.record(StageNameSchema, CapabilityTierSchema);

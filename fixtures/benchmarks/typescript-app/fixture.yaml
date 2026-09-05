@@ -2,7 +2,7 @@ version: 1
 id: typescript-app-v1
 description: Small TypeScript module with Vitest coverage and unrelated source noise.
 repository: repo
-repositoryRevision: 1
+repositoryRevision: 2
 tasks:
   - id: clamp-discount
     request: Clamp percentage discounts between zero and one hundred.

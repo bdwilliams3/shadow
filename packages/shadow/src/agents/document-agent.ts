@@ -81,7 +81,7 @@ export class DocumentAgent implements Agent {
         system: systemPrompt,
         input: {
           request: context.request,
-          acceptanceCriteria: task.acceptanceCriteria,
+          ...(task.acceptanceCriteria.length > 0 ? { acceptanceCriteria: task.acceptanceCriteria } : {}),
           documentationFiles,
           implementationEvidence: evidence
         },

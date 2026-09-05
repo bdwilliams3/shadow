@@ -77,6 +77,17 @@ export async function executeProcess(
     let outputLimitExceeded = false;
     let spawnError: Error | undefined;
 
+    // A child that traps SIGTERM would otherwise keep "close" from ever firing and hang
+    // the caller with no CPU and no children to point at. Escalate after a grace period.
+    let escalation: ReturnType<typeof setTimeout> | undefined;
+    const terminate = (): void => {
+      child.kill("SIGTERM");
+      if (!escalation) {
+        escalation = setTimeout(() => child.kill("SIGKILL"), 5_000);
+        escalation.unref();
+      }
+    };
+
     const capture = (target: Buffer[], chunk: Buffer): void => {
       const remaining = Math.max(0, options.maxOutputBytes - capturedBytes);
       if (remaining > 0) {
@@ -86,7 +97,7 @@ export async function executeProcess(
       }
       if (chunk.byteLength > remaining && !outputLimitExceeded) {
         outputLimitExceeded = true;
-        child.kill("SIGTERM");
+        terminate();
       }
     };
 
@@ -98,11 +109,11 @@ export async function executeProcess(
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      terminate();
     }, options.timeoutMs);
 
     const abort = (): void => {
-      child.kill("SIGTERM");
+      terminate();
     };
     options.signal.addEventListener("abort", abort, { once: true });
     child.stdin.on("error", () => {
@@ -112,6 +123,9 @@ export async function executeProcess(
 
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
+      if (escalation) {
+        clearTimeout(escalation);
+      }
       options.signal.removeEventListener("abort", abort);
       if (spawnError) {
         rejectProcess(spawnError);

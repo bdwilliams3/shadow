@@ -104,7 +104,8 @@ describe("benchmark observation capture", () => {
       totalTokens: 300,
       latencyMs: 2_000,
       humanInterventions: 1,
-      irrelevantFilesLoaded: 2,
+      // One distinct irrelevant path, even though two attempts each selected it.
+      irrelevantFilesLoaded: 1,
       stageCount: 1,
       retries: 1
     });

@@ -10,7 +10,7 @@ This repository currently contains the first runnable vertical slice:
 - Transactional SQLite run and event persistence under `.shadow/shadow.db`, with one-time legacy JSON/JSONL import.
 - Content-addressed artifact storage under `.shadow/artifacts` and JSONL audit export through `shadow logs`.
 - Approval risk taxonomy for read-only, workspace-write, external-write, and destructive actions.
-- Provider-neutral model routing plus an OpenAI-compatible adapter with schema-constrained output.
+- Provider-neutral model routing plus an OpenAI-compatible adapter with schema-constrained output, a per-request deadline, and truncation detection.
 - Preflight input/output token and cost estimation at model-call, stage, and run boundaries.
 - A policy-aware deterministic action runner with validated, versioned manifests.
 - Registered repository inventory, bounded context selection, Git status, patch check/apply, test, and type-check actions.
@@ -20,6 +20,8 @@ This repository currently contains the first runnable vertical slice:
 - A bounded Develop agent that selects context, redacts likely secrets, requests one unified diff, checks its scope, and applies it through the tool gateway.
 - New-file creation in Develop, scoped by the create-mode entries Git reports rather than by model claims, and capped per attempt.
 - A bounded remediation loop that returns compact Test or Validate failure evidence to Develop for one configurable cycle.
+- A Develop decline path: an empty patch with a reason blocks the run instead of forcing the model to invent work it should refuse.
+- Stage tasks carry no boilerplate acceptance criteria; agents receive the user's request until a model-backed Plan stage can derive real per-task criteria.
 - Deterministic Plan, Test, and Validate agents that exchange compact structured evidence.
 - Schema-constrained Design and Document agents that consume hash-verified prior-stage artifacts.
 - Documentation patches constrained to selected existing documentation files and applied through the tool gateway.
@@ -29,7 +31,7 @@ This repository currently contains the first runnable vertical slice:
 - Test-stage MCP preference with automatic fallback to the registered local test action.
 - Changed-file-to-test selection using indexed filenames, proximity, and import relationships.
 - Opt-in deployment profiles with deterministic command arrays, explicit credential environment names, dry-run previews, health checks, and separately approved rollback.
-- Versioned Python, TypeScript, and mixed-language benchmark fixtures with deterministic acceptance checks.
+- Versioned, hermetic Python, TypeScript, and mixed-language benchmark fixtures with deterministic acceptance checks.
 - An automated benchmark executor that provisions isolated fixture workspaces, runs Shadow against a single-frontier-model baseline, scores acceptance deterministically, and assembles paired threshold reports.
 - Durable stage tasks, bounded retry histories, cross-process cancellation, and approval records.
 - CLI commands for `shadow`, `shadow run`, `shadow resume`, `shadow status`, `shadow approve`, `shadow reject`, `shadow cancel`, `shadow init`, `shadow models`, `shadow actions list`, `shadow mcp list`, `shadow config validate`, `shadow doctor`, and `shadow logs`.

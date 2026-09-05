@@ -18,7 +18,7 @@ describe("benchmark fixtures", () => {
       YAML.parse(await readFile(resolve(repositoryRoot, path), "utf8"))
     );
 
-    expect(fixture.repositoryRevision).toBe(1);
+    expect(fixture.repositoryRevision).toBeGreaterThanOrEqual(1);
     expect(fixture.tasks.length).toBeGreaterThan(0);
   });
 });

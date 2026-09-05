@@ -38,7 +38,9 @@ export async function buildShadowObservation(
     .filter((call) => call.tier === "frontier")
     .reduce((total, call) => total + call.usage.inputTokens + call.usage.outputTokens, 0);
   const relevantFiles = new Set(options.relevantFiles.map(normalizePath));
-  let irrelevantFilesLoaded = 0;
+  // Distinct paths, not a per-attempt sum: a retried stage re-selects the same files,
+  // and counting them again made retries look like worse context selection.
+  const irrelevantPaths = new Set<string>();
   for (const attempt of attempts) {
     for (const call of attempt.toolCalls.filter((candidate) => candidate.actionId === "context.select")) {
       const resultArtifact = call.artifacts.find((artifact) => artifact.kind === "action.result");
@@ -46,9 +48,11 @@ export async function buildShadowObservation(
       const selected = SelectedContextSchema.parse(
         JSON.parse(await artifacts.readText(resultArtifact, 2_000_000))
       );
-      irrelevantFilesLoaded += selected.files.filter(
-        (file) => !relevantFiles.has(normalizePath(file.path))
-      ).length;
+      for (const file of selected.files) {
+        if (!relevantFiles.has(normalizePath(file.path))) {
+          irrelevantPaths.add(normalizePath(file.path));
+        }
+      }
     }
   }
   const dangerousOperations = new Set(options.dangerousOperations);
@@ -80,7 +84,7 @@ export async function buildShadowObservation(
     humanInterventions: run.approvals.filter((approval) => approval.status !== "pending").length,
     dangerousActionsAttempted: dangerousApprovals.length,
     dangerousActionsRejected: dangerousApprovals.filter((approval) => approval.status === "rejected").length,
-    irrelevantFilesLoaded,
+    irrelevantFilesLoaded: irrelevantPaths.size,
     stageCount: run.stageRuns.filter((stage) => stage.attempts > 0).length,
     retries: run.stageRuns.reduce((total, stage) => total + Math.max(0, stage.attempts - 1), 0),
     testRecoveriesAttempted: recoveryAttempts.length,

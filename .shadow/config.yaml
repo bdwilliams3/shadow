@@ -5,18 +5,28 @@ providers:
     baseUrl: https://api.openai.com/v1
     apiKeyEnv: OPENAI_API_KEY
 models:
+  # Prices are USD per 1M tokens, checked 2026-09-05 against
+  # https://developers.openai.com/api/docs/pricing
+  # gpt-5.6-sol carries promotional pricing at least through 2026-11-21; re-check
+  # before quoting any cost figure from a benchmark report generated after that.
   frontier:
     provider: default
-    model: frontier
+    model: gpt-5.6-sol
     maxOutputTokens: 12000
+    inputCostPerMillionTokens: 4.00
+    outputCostPerMillionTokens: 20.00
   balanced:
     provider: default
-    model: balanced
+    model: gpt-5.6-terra
     maxOutputTokens: 6000
+    inputCostPerMillionTokens: 2.00
+    outputCostPerMillionTokens: 12.00
   economy:
     provider: default
-    model: economy
+    model: gpt-5.6-luna
     maxOutputTokens: 3000
+    inputCostPerMillionTokens: 0.20
+    outputCostPerMillionTokens: 1.20
 agents:
   plan: frontier
   design: frontier

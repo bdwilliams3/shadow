@@ -31,7 +31,10 @@ const maxCreatedFiles = 10;
 
 export const DevelopOutputSchema = z.object({
   summary: z.string().min(1),
-  patch: z.string().min(1).max(500_000),
+  // Empty when the agent declines. Requiring a non-empty patch left the model no way to
+  // refuse impermissible work, so it fabricated one and ran to the output ceiling.
+  patch: z.string().max(500_000).default(""),
+  declineReason: z.string().default(""),
   decisions: z.array(z.string()).default([]),
   openRisks: z.array(z.string()).default([])
 });
@@ -45,6 +48,7 @@ const developSystemPrompt = [
   "Do not delete files, create symlinks, include binary patches, modify files absent from context, or add unrelated changes.",
   "You may add new files with a create-mode diff when the change genuinely requires them; keep additions minimal and related.",
   "When prior failures are supplied, this is a remediation pass: fix the reported failures without reverting work that already passed.",
+  "Decline rather than improvise: if the request asks for deletion, writes outside the workspace, actions on systems you cannot see, or anything the supplied files cannot express, return an empty patch with a one-sentence declineReason. A declined request costs one call; a fabricated patch costs several.",
   "Do not narrate tool use. Keep decisions and risks concise."
 ].join("\n");
 
@@ -135,7 +139,7 @@ export class DevelopAgent implements Agent {
         system: developSystemPrompt,
         input: {
           request: context.request,
-          acceptanceCriteria: task.acceptanceCriteria,
+          ...(task.acceptanceCriteria.length > 0 ? { acceptanceCriteria: task.acceptanceCriteria } : {}),
           constraints: task.constraints,
           existingChanges: status.output?.entries ?? [],
           ...(priorFailures.length > 0
@@ -152,6 +156,23 @@ export class DevelopAgent implements Agent {
         approved: context.approvedOperations.includes("model.complete"),
         signal: context.signal
       });
+      if (completion.output.patch.trim().length === 0) {
+        const reason = completion.output.declineReason.trim() ||
+          "Develop returned no patch and no reason.";
+        return {
+          status: "blocked",
+          summary: `Develop declined the request: ${reason}`,
+          decisions: completion.output.decisions,
+          artifacts: producedArtifacts,
+          changedFiles: [],
+          toolCalls: actionRecords,
+          modelCalls: [completion.record],
+          testResults: [],
+          openRisks: [...completion.output.openRisks, reason],
+          usage: completion.record.usage
+        };
+      }
+
       const patchArtifact = await this.artifacts.writeText(
         "develop.patch",
         "develop.patch",
@@ -370,7 +391,7 @@ export class TestAgent implements Agent {
     return {
       status: testStatus === "failed" || execution.record.status === "failed"
         ? "failed"
-        : testStatus === "not_configured"
+        : testStatus === "not_configured" || testStatus === "unavailable"
           ? "skipped"
           : "completed",
       summary: execution.record.summary,
@@ -383,7 +404,11 @@ export class TestAgent implements Agent {
       toolCalls: [...preludeRecords, execution.record],
       modelCalls: [],
       testResults: testStatus ? [testStatus] : [],
-      openRisks: testStatus === "not_configured" ? ["No repository test command is configured."] : [],
+      openRisks: testStatus === "not_configured"
+        ? ["No repository test command is configured."]
+        : testStatus === "unavailable"
+          ? [`Tests were not run: ${execution.record.summary}`]
+          : [],
       usage: noUsage
     };
   }
@@ -458,6 +483,9 @@ export class ValidateAgent implements Agent {
     }
     if (typecheckStatus === "not_configured") {
       risks.push("No repository type-check command is configured.");
+    }
+    if (typecheckStatus === "unavailable") {
+      risks.push(`Type check was not run: ${typecheck.record.summary}`);
     }
     for (const finding of secrets.output?.findings ?? []) {
       risks.push(`Secret scan ${finding.severity}: ${finding.path}:${finding.line} (${finding.rule}).`);

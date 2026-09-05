@@ -65,7 +65,7 @@ export class DesignAgent implements Agent {
         input: {
           goal: task.goal,
           constraints: task.constraints,
-          acceptanceCriteria: task.acceptanceCriteria,
+          ...(task.acceptanceCriteria.length > 0 ? { acceptanceCriteria: task.acceptanceCriteria } : {}),
           repositoryFiles: selection.output?.files ?? [],
           priorArtifacts: inputArtifacts
         },

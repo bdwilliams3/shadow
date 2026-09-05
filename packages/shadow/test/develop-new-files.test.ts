@@ -133,6 +133,35 @@ describe("develop new-file creation", () => {
     expect(develop?.result?.summary).toContain("above the bounded limit");
   });
 
+  it("blocks the run when Develop declines instead of fabricating a patch", async () => {
+    const workspace = await buildWorkspace();
+    let calls = 0;
+    const provider: ModelProvider = {
+      async complete() {
+        calls += 1;
+        return {
+          text: JSON.stringify({
+            summary: "Declined.",
+            patch: "",
+            declineReason: "The request deletes files outside the workspace.",
+            decisions: [],
+            openRisks: []
+          }),
+          usage: { inputTokens: 100, outputTokens: 20, estimatedCostUsd: 0 }
+        };
+      }
+    };
+
+    const { run, develop } = await runDevelop(workspace, provider);
+
+    expect(develop?.status).toBe("blocked");
+    expect(develop?.result?.summary).toContain("deletes files outside the workspace");
+    expect(develop?.result?.changedFiles).toEqual([]);
+    expect(run.state).toBe("FAILED");
+    // A decline costs one call; it must not be retried into the output ceiling.
+    expect(calls).toBe(1);
+  });
+
   it("still refuses a patch that deletes a file", async () => {
     const workspace = await buildWorkspace();
     const patch = [

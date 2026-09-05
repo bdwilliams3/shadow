@@ -1,8 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { applyDiscount } from "../src/discount.js";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { applyDiscount } from "../src/discount.ts";
 
-describe("applyDiscount", () => {
-  it("applies a percentage discount", () => {
-    expect(applyDiscount(100, 25)).toBe(75);
-  });
+test("applies a percentage discount", () => {
+  assert.equal(applyDiscount(100, 25), 75);
 });

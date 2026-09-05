@@ -10,7 +10,7 @@ const QualityInputSchema = z.object({
 
 export const QualityResultSchema = z.object({
   check: z.enum(["test", "typecheck"]),
-  status: z.enum(["passed", "failed", "not_configured"]),
+  status: z.enum(["passed", "failed", "not_configured", "unavailable"]),
   command: z.array(z.string()).optional()
 });
 export type QualityResult = z.infer<typeof QualityResultSchema>;
@@ -111,7 +111,33 @@ function buildQualityAction(check: QualityResult["check"]): ActionDefinition<
         };
       }
 
-      const result = await context.execute(command);
+      let result: ProcessResult;
+      try {
+        result = await context.execute(command);
+      } catch (error) {
+        // The executable itself could not be started.
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          summary: `${check} command could not be started: ${message}`,
+          output: { check, status: "unavailable", command },
+          commands: [command],
+          exitCode: 0,
+          stderr: message
+        };
+      }
+      // Exit 127 is the shell's "command not found": the runner is not installed. That
+      // is an environment fact, not evidence about the code, and must not be fed back
+      // into a remediation cycle as a test failure.
+      if (result.exitCode === 127) {
+        return {
+          summary: `${check} runner is not installed (${command[0]} exited 127).`,
+          output: { check, status: "unavailable", command },
+          commands: [command],
+          exitCode: 0,
+          stdout: result.stdout,
+          stderr: result.stderr
+        };
+      }
       const status = result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded
         ? "passed"
         : "failed";
