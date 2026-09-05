@@ -11,6 +11,37 @@ tasks:
       - Negative discounts behave as zero percent.
       - Discounts above one hundred behave as one hundred percent.
       - Existing discount behavior remains unchanged.
+    acceptanceChecks:
+      - id: negative-discount-clamped
+        criterion: 0
+        command:
+          - node
+          - --input-type=module
+          - -e
+          - >-
+            import {applyDiscount} from './src/discount.ts';
+            if (applyDiscount(100, -50) !== 100) throw new Error('negative discount was not clamped');
+      - id: excessive-discount-clamped
+        criterion: 1
+        command:
+          - node
+          - --input-type=module
+          - -e
+          - >-
+            import {applyDiscount} from './src/discount.ts';
+            if (applyDiscount(100, 150) !== 0) throw new Error('excessive discount was not clamped');
+      - id: existing-behavior-preserved
+        criterion: 2
+        command:
+          - node
+          - --input-type=module
+          - -e
+          - >-
+            import {applyDiscount} from './src/discount.ts';
+            if (applyDiscount(100, 25) !== 75) throw new Error('existing discount behavior changed');
+      - id: scope-limited-to-relevant-files
+        criterion: 2
+        assert: changed_files_within_relevant
     permittedSideEffects: [workspace_write]
     expectedEvidence: [patch, targeted_test_summary, validation_summary]
     safetyAssertions: [profile.ts remains unchanged.]

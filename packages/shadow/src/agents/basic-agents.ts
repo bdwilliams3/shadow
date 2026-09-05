@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Agent, StageContext } from "./contract.js";
 import type { ArtifactStore } from "../artifacts/store.js";
+import { loadArtifactContext } from "../context/artifact-context.js";
 import type { TestsExecutor } from "../mcp/tests/client.js";
 import type { TestRunSummary } from "../mcp/tests/types.js";
 import { ModelRouter, ModelRoutingError } from "../models/router.js";
@@ -25,6 +26,9 @@ const noUsage = {
   estimatedCostUsd: 0
 };
 
+/** One bounded Develop work unit may introduce a handful of files, not scaffold a tree. */
+const maxCreatedFiles = 10;
+
 export const DevelopOutputSchema = z.object({
   summary: z.string().min(1),
   patch: z.string().min(1).max(500_000),
@@ -39,6 +43,8 @@ const developSystemPrompt = [
   "Return JSON matching the supplied schema.",
   "The patch must be a standard unified Git diff with workspace-relative paths.",
   "Do not delete files, create symlinks, include binary patches, modify files absent from context, or add unrelated changes.",
+  "You may add new files with a create-mode diff when the change genuinely requires them; keep additions minimal and related.",
+  "When prior failures are supplied, this is a remediation pass: fix the reported failures without reverting work that already passed.",
   "Do not narrate tool use. Keep decisions and risks concise."
 ].join("\n");
 
@@ -115,6 +121,14 @@ export class DevelopAgent implements Agent {
       };
     }
 
+    // Compact failure evidence from a remediation cycle; raw logs stay out of context.
+    const priorFailures = await loadArtifactContext(
+      this.artifacts,
+      task.inputs,
+      new Set(["remediation.failure"]),
+      12_000
+    );
+
     try {
       const completion = await this.models.completeStructured({
         tier: this.tier,
@@ -124,6 +138,9 @@ export class DevelopAgent implements Agent {
           acceptanceCriteria: task.acceptanceCriteria,
           constraints: task.constraints,
           existingChanges: status.output?.entries ?? [],
+          ...(priorFailures.length > 0
+            ? { priorFailures: priorFailures.map((entry) => entry.content) }
+            : {}),
           files: selection.output.files
         },
         schemaName: "shadow_develop_result_v1",
@@ -164,8 +181,13 @@ export class DevelopAgent implements Agent {
         };
       }
 
+      // A changed file must either be in the bounded context or be one Git reports the
+      // patch as creating. New paths come from `git apply --summary`, never from the model.
       const selectedPaths = new Set(selection.output.files.map((file) => file.path));
-      const unselectedChanges = check.output.changedFiles.filter((file) => !selectedPaths.has(file));
+      const createdFiles = check.output.createdFiles;
+      const unselectedChanges = check.output.changedFiles.filter(
+        (file) => !selectedPaths.has(file) && !createdFiles.includes(file)
+      );
       if (unselectedChanges.length > 0) {
         return {
           status: "failed",
@@ -180,12 +202,29 @@ export class DevelopAgent implements Agent {
           usage: completion.record.usage
         };
       }
+      if (createdFiles.length > maxCreatedFiles) {
+        return {
+          status: "failed",
+          summary: `Patch created ${createdFiles.length} files, above the bounded limit of ${maxCreatedFiles}.`,
+          decisions: completion.output.decisions,
+          artifacts: producedArtifacts,
+          changedFiles: check.output.changedFiles,
+          toolCalls: actionRecords,
+          modelCalls: [completion.record],
+          testResults: [],
+          openRisks: [...completion.output.openRisks, "The patch created more files than one bounded work unit allows."],
+          usage: completion.record.usage
+        };
+      }
+      const creationDecisions = createdFiles.length > 0
+        ? [`Created ${createdFiles.length} new files: ${createdFiles.join(", ")}.`]
+        : [];
 
       if (context.dryRun) {
         return {
           status: "completed",
           summary: `Dry run produced a valid patch affecting ${check.output.changedFiles.length} files.`,
-          decisions: completion.output.decisions,
+          decisions: [...completion.output.decisions, ...creationDecisions],
           artifacts: producedArtifacts,
           changedFiles: check.output.changedFiles,
           toolCalls: actionRecords,
@@ -236,7 +275,7 @@ export class DevelopAgent implements Agent {
       return {
         status: apply.output?.applied ? "completed" : apply.record.status === "blocked" ? "blocked" : "failed",
         summary: apply.record.summary,
-        decisions: completion.output.decisions,
+        decisions: [...completion.output.decisions, ...creationDecisions],
         artifacts: producedArtifacts,
         changedFiles: apply.output?.changedFiles ?? check.output.changedFiles,
         toolCalls: actionRecords,

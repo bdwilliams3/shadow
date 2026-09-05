@@ -68,7 +68,8 @@ export const defaultConfig: ShadowConfig = {
   lifecycle: {
     enabledStages: ["plan", "design", "develop", "test", "validate", "deploy", "document"],
     maxStageRetries: 1,
-    maxModelCallsPerStage: 3
+    maxModelCallsPerStage: 3,
+    maxRemediationCycles: 1
   },
   workspace: {
     exclusions: []

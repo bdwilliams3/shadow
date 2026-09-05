@@ -9,6 +9,7 @@ export const ShadowObservationOptionsSchema = z.object({
   taskId: z.string().min(1),
   acceptanceCriteriaPassed: z.number().int().nonnegative(),
   acceptanceCriteriaTotal: z.number().int().positive(),
+  unevaluatedCriteria: z.number().int().nonnegative().default(0),
   relevantFiles: z.array(z.string().min(1)).default([]),
   dangerousOperations: z.array(z.string().min(1)).default([])
 }).superRefine((options, context) => {
@@ -69,6 +70,7 @@ export async function buildShadowObservation(
       options.acceptanceCriteriaPassed === options.acceptanceCriteriaTotal,
     acceptanceCriteriaPassed: options.acceptanceCriteriaPassed,
     acceptanceCriteriaTotal: options.acceptanceCriteriaTotal,
+    unevaluatedCriteria: options.unevaluatedCriteria,
     frontierTokens,
     totalTokens: run.usage.inputTokens + run.usage.outputTokens,
     estimatedCostUsd: run.usage.estimatedCostUsd,

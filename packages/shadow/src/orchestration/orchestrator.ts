@@ -186,7 +186,14 @@ export class LifecycleOrchestrator {
     monitor.unref();
 
     try {
-      for (const task of run.stageTasks) {
+      const artifactStore = new ArtifactStore(
+        resolve(run.workspaceRoot, this.config.persistence.artifactsDir)
+      );
+      const cycleStart = new Map<string, number>();
+      let remediationCycles = 0;
+      let index = 0;
+      stageLoop: while (index < run.stageTasks.length) {
+        const task = run.stageTasks[index] as StageTask;
         const persisted = await this.store.getRun(run.id);
         if (persisted?.state === "CANCELLED") {
           return persisted;
@@ -197,6 +204,7 @@ export class LifecycleOrchestrator {
 
         const stageRun = this.stageRunFor(run, task);
         if (stageRun.status === "completed" || stageRun.status === "skipped") {
+          index += 1;
           continue;
         }
         if (
@@ -209,18 +217,40 @@ export class LifecycleOrchestrator {
         const approvedOperations = run.approvals
           .filter((approval) => approval.stageTaskId === task.id && approval.status === "approved")
           .map((approval) => approval.operation);
-        let failedAttempts = stageRun.attemptResults.filter((result) => result.status === "failed").length;
+        // Retry and model-call budgets are scoped to the current remediation cycle so a
+        // remediation pass is not immediately blocked by the attempts that triggered it.
+        const attemptsBefore = cycleStart.get(task.id) ?? 0;
+        let failedAttempts = stageRun.attemptResults
+          .slice(attemptsBefore)
+          .filter((result) => result.status === "failed").length;
 
         while (true) {
-          const modelCalls = stageRun.attemptResults.reduce(
-            (count, result) =>
-              count + result.modelCalls.filter((call) => call.status !== "blocked").length,
-            0
-          );
+          const modelCalls = stageRun.attemptResults
+            .slice(attemptsBefore)
+            .reduce(
+              (count, result) =>
+                count + result.modelCalls.filter((call) => call.status !== "blocked").length,
+              0
+            );
           if (
             failedAttempts > this.config.lifecycle.maxStageRetries ||
             modelCalls >= this.config.lifecycle.maxModelCallsPerStage
           ) {
+            const developIndex = await this.planRemediation(
+              run,
+              task,
+              index,
+              stageRun.result,
+              "retry or model-call limit reached",
+              remediationCycles,
+              cycleStart,
+              artifactStore
+            );
+            if (developIndex !== undefined) {
+              remediationCycles += 1;
+              index = developIndex;
+              continue stageLoop;
+            }
             return this.transition(run, "FAILED", {
               stage: task.stage,
               reason: "retry or model-call limit reached"
@@ -348,6 +378,21 @@ export class LifecycleOrchestrator {
               await this.store.updateRun(this.touch(run));
               continue;
             }
+            const developIndex = await this.planRemediation(
+              run,
+              task,
+              index,
+              result,
+              result.summary,
+              remediationCycles,
+              cycleStart,
+              artifactStore
+            );
+            if (developIndex !== undefined) {
+              remediationCycles += 1;
+              index = developIndex;
+              continue stageLoop;
+            }
             return this.transition(run, "FAILED", { stage: task.stage, reason: result.summary });
           }
           return this.transition(run, "FAILED", {
@@ -355,12 +400,86 @@ export class LifecycleOrchestrator {
             reason: `agent returned non-terminal status ${result.status}`
           });
         }
+
+        index += 1;
       }
 
       return this.transition(run, "COMPLETED", {});
     } finally {
       clearInterval(monitor);
     }
+  }
+
+  /**
+   * Routes a terminal Test or Validate failure back into a bounded Develop remediation
+   * pass. The failure reaches Develop as a compact artifact — summaries, normalized
+   * failures, and open risks — never the raw command output those risks were derived
+   * from. Returns the stage index to resume from, or undefined when no remediation is
+   * available.
+   */
+  private async planRemediation(
+    run: Run,
+    task: StageTask,
+    stageIndex: number,
+    result: StageResult | undefined,
+    reason: string,
+    remediationCycles: number,
+    cycleStart: Map<string, number>,
+    artifacts: ArtifactStore
+  ): Promise<number | undefined> {
+    if (task.stage !== "test" && task.stage !== "validate") {
+      return undefined;
+    }
+    if (run.dryRun || remediationCycles >= this.config.lifecycle.maxRemediationCycles) {
+      return undefined;
+    }
+    const developIndex = run.stageTasks.findIndex(
+      (candidate, candidateIndex) => candidate.stage === "develop" && candidateIndex < stageIndex
+    );
+    if (developIndex < 0) {
+      return undefined;
+    }
+    const developTask = run.stageTasks[developIndex] as StageTask;
+    const developRun = this.stageRunFor(run, developTask);
+    if (!developRun.result || developRun.result.status !== "completed") {
+      return undefined;
+    }
+
+    const failure = {
+      stage: task.stage,
+      reason,
+      summary: result?.summary ?? reason,
+      failures: result?.openRisks ?? [],
+      testResults: result?.testResults ?? [],
+      changedFiles: result?.changedFiles ?? [],
+      toolSummaries: (result?.toolCalls ?? [])
+        .filter((call) => call.status === "failed")
+        .map((call) => ({ actionId: call.actionId, summary: call.summary }))
+    };
+    const artifact = await artifacts.writeText(
+      "remediation.failure",
+      `${task.stage}.failure.json`,
+      `${JSON.stringify(failure, null, 2)}\n`
+    );
+
+    developTask.inputs = [...developTask.inputs, artifact];
+    for (let candidate = developIndex; candidate <= stageIndex; candidate += 1) {
+      const candidateTask = run.stageTasks[candidate] as StageTask;
+      const candidateRun = this.stageRunFor(run, candidateTask);
+      cycleStart.set(candidateTask.id, candidateRun.attemptResults.length);
+      candidateRun.status = "pending";
+      delete candidateRun.completedAt;
+    }
+
+    await this.store.updateRun(this.touch(run));
+    await this.store.appendEvent(run.id, "run.remediation_started", {
+      failedStage: task.stage,
+      reason,
+      cycle: remediationCycles + 1,
+      artifactId: artifact.id,
+      resumeStage: developTask.stage
+    });
+    return developIndex;
   }
 
   private recordResult(run: Run, stageRun: StageRun, result: StageResult): void {

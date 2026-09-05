@@ -10,6 +10,7 @@ export const PatchResultSchema = z.object({
   valid: z.boolean(),
   applied: z.boolean(),
   changedFiles: z.array(z.string()),
+  createdFiles: z.array(z.string()).default([]),
   diagnostics: z.string()
 });
 export type PatchResult = z.infer<typeof PatchResultSchema>;
@@ -36,6 +37,22 @@ function parseNumstat(value: string): string[] {
   return [...new Set(paths)];
 }
 
+/**
+ * Files Git itself reports the patch as creating. Taken from `git apply --summary`
+ * rather than from a model claim, so a modification can never be passed off as a
+ * new file to escape the bounded develop scope.
+ */
+function parseCreatedFiles(summary: string): string[] {
+  const created: string[] = [];
+  for (const line of summary.split("\n")) {
+    const match = /^\s*create mode \d+ (.+)$/.exec(line);
+    if (match?.[1]) {
+      created.push(match[1].trim());
+    }
+  }
+  return [...new Set(created)];
+}
+
 function safeChangedFiles(files: string[]): boolean {
   return files.every((path) => !isAbsolute(path) && !path.split(/[\\/]/).includes(".."));
 }
@@ -47,11 +64,16 @@ function failed(result: ProcessResult): boolean {
 async function checkPatch(
   patch: string,
   context: ActionHandlerContext
-): Promise<{ check: ProcessResult; numstat?: ProcessResult; changedFiles: string[] }> {
+): Promise<{
+  check: ProcessResult;
+  numstat?: ProcessResult;
+  changedFiles: string[];
+  createdFiles: string[];
+}> {
   const checkCommand = ["git", "apply", "--check", "--whitespace=error-all", "-"];
   const check = await context.execute(checkCommand, { stdin: patch });
   if (failed(check)) {
-    return { check, changedFiles: [] };
+    return { check, changedFiles: [], createdFiles: [] };
   }
   const numstatCommand = ["git", "apply", "--numstat", "-z", "-"];
   const numstat = await context.execute(numstatCommand, { stdin: patch });
@@ -68,13 +90,14 @@ async function checkPatch(
     return {
       check: { ...check, exitCode: 1, stderr: "File deletion, symlink changes, and binary patches require a separate approved action." },
       numstat,
-      changedFiles
+      changedFiles,
+      createdFiles: []
     };
   }
   if (failed(summary)) {
-    return { check: summary, numstat, changedFiles };
+    return { check: summary, numstat, changedFiles, createdFiles: [] };
   }
-  return { check, numstat, changedFiles };
+  return { check, numstat, changedFiles, createdFiles: parseCreatedFiles(summary.stdout) };
 }
 
 export const patchCheckAction: ActionDefinition<z.infer<typeof PatchInputSchema>, PatchResult> = {
@@ -106,7 +129,13 @@ export const patchCheckAction: ActionDefinition<z.infer<typeof PatchInputSchema>
       summary: valid
         ? `Patch is valid and affects ${result.changedFiles.length} files.`
         : "Patch validation failed.",
-      output: { valid, applied: false, changedFiles: result.changedFiles, diagnostics },
+      output: {
+        valid,
+        applied: false,
+        changedFiles: result.changedFiles,
+        createdFiles: result.createdFiles,
+        diagnostics
+      },
       exitCode: valid ? 0 : result.check.exitCode ?? 1,
       stdout: result.numstat?.stdout ?? result.check.stdout,
       stderr: diagnostics
@@ -141,7 +170,13 @@ export const patchApplyAction: ActionDefinition<z.infer<typeof PatchInputSchema>
       const diagnostics = [checked.check.stderr, checked.numstat?.stderr ?? ""].filter(Boolean).join("\n");
       return {
         summary: "Patch changed after validation or no longer applies cleanly.",
-        output: { valid: false, applied: false, changedFiles: checked.changedFiles, diagnostics },
+        output: {
+          valid: false,
+          applied: false,
+          changedFiles: checked.changedFiles,
+          createdFiles: checked.createdFiles,
+          diagnostics
+        },
         exitCode: checked.check.exitCode ?? 1,
         stderr: diagnostics
       };
@@ -157,6 +192,7 @@ export const patchApplyAction: ActionDefinition<z.infer<typeof PatchInputSchema>
         valid: true,
         applied: success,
         changedFiles: checked.changedFiles,
+        createdFiles: checked.createdFiles,
         diagnostics: applied.stderr
       },
       exitCode: success ? 0 : applied.exitCode ?? 1,

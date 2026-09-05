@@ -6,10 +6,12 @@ import { stdin as input, stdout as output } from "node:process";
 import { dirname, resolve } from "node:path";
 import { Command } from "commander";
 import { ArtifactStore } from "../artifacts/store.js";
+import { executeBenchmark, formatBenchmarkExecution } from "../benchmarks/executor.js";
 import { buildShadowObservation } from "../benchmarks/observe.js";
 import { buildBenchmarkReport, formatBenchmarkReport } from "../benchmarks/report.js";
 import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/load.js";
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
+import { createConfiguredProviders } from "../models/factory.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
 import type { Run } from "../orchestration/types.js";
 import { openSQLitePersistenceStore, type SQLitePersistenceStore } from "../persistence/sqlite-store.js";
@@ -22,6 +24,14 @@ async function buildStore(workspaceRoot: string): Promise<SQLitePersistenceStore
     resolve(workspaceRoot, config.persistence.databasePath),
     resolve(workspaceRoot, config.persistence.runsDir)
   );
+}
+
+function exitCodeForRun(run: Run): void {
+  // Non-interactive invocations must be usable as a gate: a failed or cancelled run
+  // exits non-zero. The interactive loop deliberately does not set this.
+  if (run.state === "FAILED" || run.state === "CANCELLED") {
+    process.exitCode = 1;
+  }
 }
 
 async function runRequest(request: string, options: { dryRun?: boolean; json?: boolean }): Promise<Run> {
@@ -192,6 +202,54 @@ async function validateConfig(): Promise<void> {
   const { config, sources } = await loadConfig(process.cwd());
   console.log(`Configuration is valid. Sources: ${sources.length > 0 ? sources.join(", ") : "defaults"}`);
   console.log(`Enabled stages: ${config.lifecycle.enabledStages.join(", ")}`);
+}
+
+async function runBenchmark(
+  fixtureDirs: string[],
+  options: {
+    benchmarkId: string;
+    task?: string[];
+    system?: string[];
+    workRoot?: string;
+    out?: string;
+    report?: boolean;
+    json?: boolean;
+  }
+): Promise<void> {
+  const workspaceRoot = process.cwd();
+  const { config } = await loadConfig(workspaceRoot);
+  const { providers, diagnostics } = createConfiguredProviders(config);
+  for (const diagnostic of diagnostics) {
+    console.error(diagnostic);
+  }
+
+  const execution = await executeBenchmark(
+    {
+      benchmarkId: options.benchmarkId,
+      fixtureDirs: fixtureDirs.map((dir) => resolve(workspaceRoot, dir)),
+      taskIds: options.task ?? [],
+      systems: options.system ?? ["baseline", "shadow"],
+      ...(options.workRoot ? { workRoot: resolve(workspaceRoot, options.workRoot) } : {})
+    },
+    { config, providers }
+  );
+
+  if (options.out) {
+    await writeFile(
+      resolve(workspaceRoot, options.out),
+      `${JSON.stringify(execution.input, null, 2)}\n`,
+      "utf8"
+    );
+  }
+  console.log(options.json ? JSON.stringify(execution.input, null, 2) : formatBenchmarkExecution(execution));
+
+  if (options.report) {
+    const report = buildBenchmarkReport(execution.input);
+    console.log(formatBenchmarkReport(report));
+    if (!report.passed) {
+      process.exitCode = 1;
+    }
+  }
 }
 
 async function reportBenchmark(inputPath: string, options: { json?: boolean }): Promise<void> {
@@ -370,7 +428,7 @@ program
   .option("--dry-run", "plan without executing workspace-changing actions")
   .option("--json", "print the run as JSON")
   .action(async (request: string, options: { dryRun?: boolean; json?: boolean }) => {
-    await runRequest(request, options);
+    exitCodeForRun(await runRequest(request, options));
   });
 
 program.command("init").description("Create repository Shadow configuration").action(initConfig);
@@ -387,7 +445,7 @@ program
   .option("--json", "print the run as JSON")
   .description("Resume an interrupted or approved run")
   .action(async (runId: string, options: { json?: boolean }) => {
-    await resumeRun(runId, options);
+    exitCodeForRun(await resumeRun(runId, options));
   });
 
 program
@@ -437,6 +495,19 @@ program
   .action(validateConfig);
 
 const benchmark = program.command("benchmark").description("Benchmark evaluation commands");
+
+benchmark
+  .command("run")
+  .argument("<fixture-dirs...>", "benchmark fixture directories containing fixture.yaml")
+  .requiredOption("--benchmark-id <id>", "identifier recorded on the assembled observations")
+  .option("--task <ids...>", "restrict execution to these task identifiers")
+  .option("--system <names...>", "systems to run: baseline, shadow")
+  .option("--work-root <dir>", "directory for provisioned fixture workspaces")
+  .option("--out <path>", "write assembled observations to this JSON file")
+  .option("--report", "build and print the paired comparison report")
+  .option("--json", "print assembled observations as JSON")
+  .description("Provision fixture workspaces, run both systems, and assemble paired observations")
+  .action(runBenchmark);
 
 benchmark
   .command("report")

@@ -7,6 +7,7 @@ export const BenchmarkObservationSchema = z.object({
   succeeded: z.boolean(),
   acceptanceCriteriaPassed: z.number().int().nonnegative(),
   acceptanceCriteriaTotal: z.number().int().positive(),
+  unevaluatedCriteria: z.number().int().nonnegative().default(0),
   frontierTokens: z.number().int().nonnegative(),
   totalTokens: z.number().int().nonnegative(),
   estimatedCostUsd: z.number().nonnegative(),
@@ -25,6 +26,13 @@ export const BenchmarkObservationSchema = z.object({
       code: "custom",
       path: ["acceptanceCriteriaPassed"],
       message: "cannot exceed acceptanceCriteriaTotal"
+    });
+  }
+  if (observation.acceptanceCriteriaPassed + observation.unevaluatedCriteria > observation.acceptanceCriteriaTotal) {
+    context.addIssue({
+      code: "custom",
+      path: ["unevaluatedCriteria"],
+      message: "passed and unevaluated criteria cannot exceed acceptanceCriteriaTotal"
     });
   }
   if (observation.dangerousActionsRejected > observation.dangerousActionsAttempted) {
@@ -57,6 +65,7 @@ const AggregateSchema = z.object({
   taskCount: z.number().int().nonnegative(),
   taskSuccessRate: z.number().nonnegative(),
   acceptancePassRate: z.number().nonnegative(),
+  unevaluatedCriteria: z.number().int().nonnegative(),
   frontierTokens: z.number().int().nonnegative(),
   frontierTokenPercentage: z.number().nonnegative(),
   totalTokens: z.number().int().nonnegative(),
@@ -113,6 +122,8 @@ function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeo
     observations.reduce((total, observation) => total + select(observation), 0);
   const frontierTokens = sum((observation) => observation.frontierTokens);
   const totalTokens = sum((observation) => observation.totalTokens);
+  // No dangerous action attempted means the rejection requirement is vacuously met.
+  const dangerousActionsAttempted = sum((observation) => observation.dangerousActionsAttempted);
   return {
     taskCount: observations.length,
     taskSuccessRate: ratio(observations.filter((observation) => observation.succeeded).length, observations.length),
@@ -120,16 +131,16 @@ function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeo
       sum((observation) => observation.acceptanceCriteriaPassed),
       sum((observation) => observation.acceptanceCriteriaTotal)
     ),
+    unevaluatedCriteria: sum((observation) => observation.unevaluatedCriteria),
     frontierTokens,
     frontierTokenPercentage: ratio(frontierTokens, totalTokens),
     totalTokens,
     estimatedCostUsd: sum((observation) => observation.estimatedCostUsd),
     latencyMs: sum((observation) => observation.latencyMs),
     medianHumanInterventions: median(observations.map((observation) => observation.humanInterventions)),
-    dangerousActionRejectionRate: ratio(
-      sum((observation) => observation.dangerousActionsRejected),
-      sum((observation) => observation.dangerousActionsAttempted)
-    ),
+    dangerousActionRejectionRate: dangerousActionsAttempted === 0
+      ? 1
+      : ratio(sum((observation) => observation.dangerousActionsRejected), dangerousActionsAttempted),
     irrelevantFilesLoaded: sum((observation) => observation.irrelevantFilesLoaded),
     stageCount: sum((observation) => observation.stageCount),
     retries: sum((observation) => observation.retries),
@@ -197,6 +208,7 @@ export function formatBenchmarkReport(report: BenchmarkComparison): string {
     `Total tokens: ${report.shadow.totalTokens} vs ${report.baseline.totalTokens}`,
     `Estimated cost: $${report.shadow.estimatedCostUsd.toFixed(4)} vs $${report.baseline.estimatedCostUsd.toFixed(4)}`,
     `Latency: ${report.shadow.latencyMs}ms vs ${report.baseline.latencyMs}ms`,
-    `Irrelevant files loaded: ${report.shadow.irrelevantFilesLoaded} vs ${report.baseline.irrelevantFilesLoaded}`
+    `Irrelevant files loaded: ${report.shadow.irrelevantFilesLoaded} vs ${report.baseline.irrelevantFilesLoaded}`,
+    `Unevaluated criteria: ${report.shadow.unevaluatedCriteria} shadow, ${report.baseline.unevaluatedCriteria} baseline`
   ].join("\n");
 }

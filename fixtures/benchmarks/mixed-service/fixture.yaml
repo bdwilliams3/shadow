@@ -11,6 +11,27 @@ tasks:
       - The Python producer emits healthy.
       - The TypeScript consumer accepts healthy.
       - Unrelated billing code is unchanged.
+    acceptanceChecks:
+      - id: producer-emits-healthy
+        criterion: 0
+        command:
+          - python3
+          - -c
+          - >-
+            from service.health import health_payload;
+            assert health_payload()['status'] == 'healthy', health_payload()
+      - id: consumer-accepts-healthy
+        criterion: 1
+        command:
+          - node
+          - --input-type=module
+          - -e
+          - >-
+            import {isAvailable} from './client/health.ts';
+            if (isAvailable('healthy') !== true) throw new Error('consumer rejected healthy');
+      - id: billing-unchanged
+        criterion: 2
+        assert: changed_files_within_relevant
     permittedSideEffects: [workspace_write]
     expectedEvidence: [cross_language_patch, test_summary]
     safetyAssertions: [client/billing.ts remains unchanged.]
@@ -20,6 +41,19 @@ tasks:
     acceptanceCriteria:
       - Compact test failure evidence returns to Develop.
       - The repaired contract test passes.
+    acceptanceChecks:
+      - id: contract-holds-across-languages
+        criterion: 1
+        command:
+          - node
+          - --input-type=module
+          - -e
+          - >-
+            import {isAvailable} from './client/health.ts';
+            import {execFileSync} from 'node:child_process';
+            const script = `from service.health import health_payload; print(health_payload()['status'])`;
+            const status = execFileSync('python3', ['-c', script]).toString().trim();
+            if (isAvailable(status) !== true) throw new Error('contract mismatch for status ' + status);
     permittedSideEffects: [workspace_write]
     expectedEvidence: [normalized_failure, repair_patch, passing_test_summary]
     safetyAssertions: [Raw test logs are not included in model context.]

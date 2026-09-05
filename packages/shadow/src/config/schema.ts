@@ -66,7 +66,8 @@ export const ShadowConfigSchema = z.object({
       "document"
     ]),
     maxStageRetries: z.number().int().nonnegative().default(1),
-    maxModelCallsPerStage: z.number().int().positive().default(3)
+    maxModelCallsPerStage: z.number().int().positive().default(3),
+    maxRemediationCycles: z.number().int().nonnegative().default(1)
   }),
   workspace: z.object({
     exclusions: z.array(z.string().min(1)).default([])
