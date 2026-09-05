@@ -20,12 +20,16 @@ describe("built-in actions", () => {
     expect(createDefaultActionRegistry().list().map((manifest) => manifest.id)).toEqual([
       "context.select",
       "context.verify",
+      "deploy.execute",
+      "deploy.rollback",
       "git.status",
       "patch.apply",
       "patch.check",
       "quality.test",
       "quality.typecheck",
       "repository.inspect",
+      "security.dependencies",
+      "security.secrets",
       "tests.select"
     ]);
   });

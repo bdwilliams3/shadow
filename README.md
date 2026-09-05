@@ -21,13 +21,17 @@ This repository currently contains the first runnable vertical slice:
 - Deterministic Plan, Test, and Validate agents that exchange compact structured evidence.
 - Schema-constrained Design and Document agents that consume hash-verified prior-stage artifacts.
 - Documentation patches constrained to selected existing documentation files and applied through the tool gateway.
+- Validation-time secret scanning that records only rule, file, line, and severity, never matched credential values.
+- Offline `package.json` dependency-integrity scanning for malformed manifests, unbounded versions, direct remote sources, and missing lockfiles.
 - A local stdio Tests MCP server with Vitest and pytest adapters, normalized failures, cancellation, and compact artifact-backed summaries.
 - Test-stage MCP preference with automatic fallback to the registered local test action.
 - Changed-file-to-test selection using indexed filenames, proximity, and import relationships.
+- Opt-in deployment profiles with deterministic command arrays, explicit credential environment names, dry-run previews, health checks, and separately approved rollback.
+- Versioned Python, TypeScript, and mixed-language benchmark fixtures plus paired baseline/Shadow threshold reports.
 - Durable stage tasks, bounded retry histories, cross-process cancellation, and approval records.
 - CLI commands for `shadow`, `shadow run`, `shadow resume`, `shadow status`, `shadow approve`, `shadow reject`, `shadow cancel`, `shadow init`, `shadow models`, `shadow actions list`, `shadow mcp list`, `shadow config validate`, `shadow doctor`, and `shadow logs`.
 
-Deploy remains a placeholder. Develop and Document currently handle existing-repository text edits; new-file creation and conflict remediation are intentionally deferred. Model aliases in the generated configuration are placeholders and must be set to models available from the configured provider.
+All seven lifecycle agents now have concrete implementations. Develop and Document currently handle existing-repository text edits; new-file creation and conflict remediation are intentionally deferred. Model aliases in the generated configuration are placeholders and must be set to models available from the configured provider.
 
 ## Setup
 
@@ -49,10 +53,30 @@ node packages/shadow/dist/cli/index.js approve RUN_ID
 node packages/shadow/dist/cli/index.js cancel RUN_ID
 node packages/shadow/dist/cli/index.js actions list
 node packages/shadow/dist/cli/index.js mcp list
+node packages/shadow/dist/cli/index.js benchmark observe RUN_ID --fixture FIXTURE_ID --task TASK_ID --criteria-passed 3 --criteria-total 3
+node packages/shadow/dist/cli/index.js benchmark report observations.json
 node packages/shadow/dist/cli/index.js doctor
 ```
 
 After package installation through pnpm, the package bin is `shadow`.
+
+### Deployment Profiles
+
+Deployment is disabled until a profile is configured. Commands are argument arrays from trusted local configuration, not model-generated shell strings. Credential values stay in the environment and only their variable names are configured.
+
+```yaml
+deployment:
+  defaultProfile: staging
+  profiles:
+    staging:
+      environment: staging
+      deployCommand: ["./scripts/deploy", "staging"]
+      healthCheckCommand: ["./scripts/health-check", "staging"]
+      rollbackCommand: ["./scripts/rollback", "staging"]
+      credentialEnv: ["DEPLOY_TOKEN"]
+```
+
+`shadow run "deploy the current build" --dry-run` records the plan without executing commands. A live deployment pauses for approval before execution. An unhealthy deployment pauses again before rollback, and a successful rollback leaves the run failed for operator review instead of silently reporting success.
 
 ## Verification
 
@@ -64,4 +88,4 @@ npx pnpm@10.15.0 build
 
 ## Next Implementation Slice
 
-The next slice should add versioned benchmark fixtures and reports for context relevance, lifecycle correctness, and frontier-token savings. The constrained Deploy agent and dry-run deployment contract can then replace the final placeholder stage.
+The next slice should add advisory-backed dependency vulnerability adapters and a benchmark executor that provisions fixture snapshots, runs both systems, and assembles paired reports automatically.

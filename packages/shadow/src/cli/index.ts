@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { dirname, resolve } from "node:path";
 import { Command } from "commander";
+import { ArtifactStore } from "../artifacts/store.js";
+import { buildShadowObservation } from "../benchmarks/observe.js";
+import { buildBenchmarkReport, formatBenchmarkReport } from "../benchmarks/report.js";
 import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/load.js";
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
@@ -189,6 +192,49 @@ async function validateConfig(): Promise<void> {
   const { config, sources } = await loadConfig(process.cwd());
   console.log(`Configuration is valid. Sources: ${sources.length > 0 ? sources.join(", ") : "defaults"}`);
   console.log(`Enabled stages: ${config.lifecycle.enabledStages.join(", ")}`);
+}
+
+async function reportBenchmark(inputPath: string, options: { json?: boolean }): Promise<void> {
+  const path = resolve(process.cwd(), inputPath);
+  const report = buildBenchmarkReport(JSON.parse(await readFile(path, "utf8")));
+  console.log(options.json ? JSON.stringify(report, null, 2) : formatBenchmarkReport(report));
+  if (!report.passed) {
+    process.exitCode = 1;
+  }
+}
+
+async function observeBenchmark(
+  runId: string,
+  options: {
+    fixture: string;
+    task: string;
+    criteriaPassed: number;
+    criteriaTotal: number;
+    relevantFile?: string[];
+    dangerousOperation?: string[];
+  }
+): Promise<void> {
+  const workspaceRoot = process.cwd();
+  const { config } = await loadConfig(workspaceRoot);
+  const store = await openSQLitePersistenceStore(
+    resolve(workspaceRoot, config.persistence.databasePath),
+    resolve(workspaceRoot, config.persistence.runsDir)
+  );
+  try {
+    const run = await store.getRun(runId);
+    if (!run) throw new Error(`Run ${runId} was not found.`);
+    const observation = await buildShadowObservation(run, {
+      fixtureId: options.fixture,
+      taskId: options.task,
+      acceptanceCriteriaPassed: options.criteriaPassed,
+      acceptanceCriteriaTotal: options.criteriaTotal,
+      relevantFiles: options.relevantFile ?? [],
+      dangerousOperations: options.dangerousOperation ?? []
+    }, new ArtifactStore(resolve(workspaceRoot, config.persistence.artifactsDir)));
+    console.log(JSON.stringify(observation, null, 2));
+  } finally {
+    store.close();
+  }
 }
 
 async function doctor(): Promise<void> {
@@ -389,6 +435,25 @@ program
   .description("Configuration commands")
   .command("validate")
   .action(validateConfig);
+
+const benchmark = program.command("benchmark").description("Benchmark evaluation commands");
+
+benchmark
+  .command("report")
+  .argument("<input>", "paired baseline and Shadow observations as JSON")
+  .option("--json", "print the report as JSON")
+  .action(reportBenchmark);
+
+benchmark
+  .command("observe")
+  .argument("<run-id>", "completed, failed, or cancelled Shadow run")
+  .requiredOption("--fixture <id>", "benchmark fixture identifier")
+  .requiredOption("--task <id>", "benchmark task identifier")
+  .requiredOption("--criteria-passed <count>", "passed acceptance criteria", Number)
+  .requiredOption("--criteria-total <count>", "total acceptance criteria", Number)
+  .option("--relevant-file <paths...>", "expected relevant repository paths")
+  .option("--dangerous-operation <ids...>", "operations expected to be rejected")
+  .action(observeBenchmark);
 
 program.command("doctor").description("Check local dependencies and credentials").action(doctor);
 

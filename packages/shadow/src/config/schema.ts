@@ -26,6 +26,17 @@ export const ApprovalPolicySchema = z.object({
   requireApprovalForDeploy: z.boolean().default(true)
 });
 
+export const DeploymentProfileSchema = z.object({
+  environment: z.string().min(1),
+  deployCommand: z.array(z.string()).min(1),
+  healthCheckCommand: z.array(z.string()).min(1),
+  rollbackCommand: z.array(z.string()).min(1).optional(),
+  credentialEnv: z
+    .array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/))
+    .default([])
+});
+export type DeploymentProfile = z.infer<typeof DeploymentProfileSchema>;
+
 const defaultApprovalPolicy: z.infer<typeof ApprovalPolicySchema> = {
   allowWorkspaceWrites: true,
   requireApprovalForDestructive: true,
@@ -60,6 +71,10 @@ export const ShadowConfigSchema = z.object({
   workspace: z.object({
     exclusions: z.array(z.string().min(1)).default([])
   }),
+  deployment: z.object({
+    defaultProfile: z.string().min(1).optional(),
+    profiles: z.record(z.string().min(1), DeploymentProfileSchema).default({})
+  }).default({ profiles: {} }),
   approvals: ApprovalPolicySchema.default(defaultApprovalPolicy),
   persistence: z.object({
     databasePath: z.string().default(".shadow/shadow.db"),

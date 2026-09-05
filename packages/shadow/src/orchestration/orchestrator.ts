@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { DevelopAgent, PlanAgent, PlaceholderAgent, TestAgent, ValidateAgent } from "../agents/basic-agents.js";
+import { DevelopAgent, PlanAgent, TestAgent, ValidateAgent } from "../agents/basic-agents.js";
+import { DeployAgent } from "../agents/deploy-agent.js";
 import { DesignAgent } from "../agents/design-agent.js";
 import { DocumentAgent } from "../agents/document-agent.js";
 import type { Agent } from "../agents/contract.js";
@@ -130,7 +131,6 @@ export class LifecycleOrchestrator {
     const providers = this.dependencies.providers ?? createConfiguredProviders(this.config).providers;
     const models = new ModelRouter(this.config, providers);
     const tests = this.dependencies.testsExecutor ?? createConfiguredTestsExecutor(this.config, workspaceRoot);
-    const placeholder = new PlaceholderAgent("Agent implementation is pending; recorded as a planned placeholder.");
     return {
       plan: new PlanAgent(
         actions,
@@ -159,8 +159,8 @@ export class LifecycleOrchestrator {
         this.config.persistence.databasePath,
         this.config.workspace.exclusions
       ),
-      validate: new ValidateAgent(actions),
-      deploy: placeholder,
+      validate: new ValidateAgent(actions, this.config.workspace.exclusions),
+      deploy: new DeployAgent(actions, artifactStore, this.config.deployment),
       document: new DocumentAgent(
         actions,
         models,
@@ -247,10 +247,15 @@ export class LifecycleOrchestrator {
           const priorArtifacts = run.stageRuns
             .slice(0, run.stageRuns.findIndex((candidate) => candidate.id === task.id))
             .flatMap((candidate) => candidate.result?.artifacts ?? []);
+          const currentStageArtifacts = activeStageRun.attemptResults.flatMap(
+            (attempt) => attempt.artifacts
+          );
           const attemptTask: StageTask = {
             ...task,
             inputs: [...new Map(
-              [...task.inputs, ...priorArtifacts].map((artifact) => [artifact.id, artifact])
+              [...task.inputs, ...priorArtifacts, ...currentStageArtifacts].map(
+                (artifact) => [artifact.id, artifact]
+              )
             ).values()],
             retryCount: failedAttempts
           };

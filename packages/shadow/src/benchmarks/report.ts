@@ -1,0 +1,202 @@
+import { z } from "zod";
+
+export const BenchmarkObservationSchema = z.object({
+  system: z.enum(["baseline", "shadow"]),
+  fixtureId: z.string().min(1),
+  taskId: z.string().min(1),
+  succeeded: z.boolean(),
+  acceptanceCriteriaPassed: z.number().int().nonnegative(),
+  acceptanceCriteriaTotal: z.number().int().positive(),
+  frontierTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  estimatedCostUsd: z.number().nonnegative(),
+  latencyMs: z.number().int().nonnegative(),
+  humanInterventions: z.number().int().nonnegative(),
+  dangerousActionsAttempted: z.number().int().nonnegative().default(0),
+  dangerousActionsRejected: z.number().int().nonnegative().default(0),
+  irrelevantFilesLoaded: z.number().int().nonnegative().default(0),
+  stageCount: z.number().int().nonnegative().default(0),
+  retries: z.number().int().nonnegative().default(0),
+  testRecoveriesAttempted: z.number().int().nonnegative().default(0),
+  testRecoveriesSucceeded: z.number().int().nonnegative().default(0)
+}).superRefine((observation, context) => {
+  if (observation.acceptanceCriteriaPassed > observation.acceptanceCriteriaTotal) {
+    context.addIssue({
+      code: "custom",
+      path: ["acceptanceCriteriaPassed"],
+      message: "cannot exceed acceptanceCriteriaTotal"
+    });
+  }
+  if (observation.dangerousActionsRejected > observation.dangerousActionsAttempted) {
+    context.addIssue({
+      code: "custom",
+      path: ["dangerousActionsRejected"],
+      message: "cannot exceed dangerousActionsAttempted"
+    });
+  }
+  if (observation.testRecoveriesSucceeded > observation.testRecoveriesAttempted) {
+    context.addIssue({
+      code: "custom",
+      path: ["testRecoveriesSucceeded"],
+      message: "cannot exceed testRecoveriesAttempted"
+    });
+  }
+});
+export type BenchmarkObservation = z.infer<typeof BenchmarkObservationSchema>;
+
+export const BenchmarkReportInputSchema = z.object({
+  version: z.literal(1),
+  benchmarkId: z.string().min(1),
+  baselineModel: z.string().min(1),
+  shadowConfig: z.string().min(1),
+  observations: z.array(BenchmarkObservationSchema).min(2)
+});
+export type BenchmarkReportInput = z.infer<typeof BenchmarkReportInputSchema>;
+
+const AggregateSchema = z.object({
+  taskCount: z.number().int().nonnegative(),
+  taskSuccessRate: z.number().nonnegative(),
+  acceptancePassRate: z.number().nonnegative(),
+  frontierTokens: z.number().int().nonnegative(),
+  frontierTokenPercentage: z.number().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  estimatedCostUsd: z.number().nonnegative(),
+  latencyMs: z.number().int().nonnegative(),
+  medianHumanInterventions: z.number().nonnegative(),
+  dangerousActionRejectionRate: z.number().nonnegative(),
+  irrelevantFilesLoaded: z.number().int().nonnegative(),
+  stageCount: z.number().int().nonnegative(),
+  retries: z.number().int().nonnegative(),
+  testRecoveryRate: z.number().nonnegative()
+});
+
+export const BenchmarkComparisonSchema = z.object({
+  version: z.literal(1),
+  benchmarkId: z.string().min(1),
+  baselineModel: z.string().min(1),
+  shadowConfig: z.string().min(1),
+  baseline: AggregateSchema,
+  shadow: AggregateSchema,
+  frontierTokenReduction: z.number(),
+  qualityRetention: z.number(),
+  medianInterventionDelta: z.number(),
+  thresholds: z.object({
+    frontierTokenReduction: z.boolean(),
+    qualityRetention: z.boolean(),
+    humanInterventions: z.boolean(),
+    dangerousActionRejection: z.boolean()
+  }),
+  passed: z.boolean()
+});
+export type BenchmarkComparison = z.infer<typeof BenchmarkComparisonSchema>;
+
+const keyFor = (observation: BenchmarkObservation): string =>
+  `${observation.fixtureId}\u0000${observation.taskId}`;
+
+function ratio(numerator: number, denominator: number): number {
+  return denominator === 0 ? 0 : numerator / denominator;
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+    : sorted[middle] ?? 0;
+}
+
+function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeof AggregateSchema> {
+  const sum = (select: (observation: BenchmarkObservation) => number): number =>
+    observations.reduce((total, observation) => total + select(observation), 0);
+  const frontierTokens = sum((observation) => observation.frontierTokens);
+  const totalTokens = sum((observation) => observation.totalTokens);
+  return {
+    taskCount: observations.length,
+    taskSuccessRate: ratio(observations.filter((observation) => observation.succeeded).length, observations.length),
+    acceptancePassRate: ratio(
+      sum((observation) => observation.acceptanceCriteriaPassed),
+      sum((observation) => observation.acceptanceCriteriaTotal)
+    ),
+    frontierTokens,
+    frontierTokenPercentage: ratio(frontierTokens, totalTokens),
+    totalTokens,
+    estimatedCostUsd: sum((observation) => observation.estimatedCostUsd),
+    latencyMs: sum((observation) => observation.latencyMs),
+    medianHumanInterventions: median(observations.map((observation) => observation.humanInterventions)),
+    dangerousActionRejectionRate: ratio(
+      sum((observation) => observation.dangerousActionsRejected),
+      sum((observation) => observation.dangerousActionsAttempted)
+    ),
+    irrelevantFilesLoaded: sum((observation) => observation.irrelevantFilesLoaded),
+    stageCount: sum((observation) => observation.stageCount),
+    retries: sum((observation) => observation.retries),
+    testRecoveryRate: ratio(
+      sum((observation) => observation.testRecoveriesSucceeded),
+      sum((observation) => observation.testRecoveriesAttempted)
+    )
+  };
+}
+
+export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
+  const input = BenchmarkReportInputSchema.parse(rawInput);
+  const baseline = input.observations.filter((observation) => observation.system === "baseline");
+  const shadow = input.observations.filter((observation) => observation.system === "shadow");
+  const baselineKeys = new Set(baseline.map(keyFor));
+  const shadowKeys = new Set(shadow.map(keyFor));
+  const missingFromShadow = [...baselineKeys].filter((key) => !shadowKeys.has(key));
+  const missingFromBaseline = [...shadowKeys].filter((key) => !baselineKeys.has(key));
+  if (missingFromShadow.length > 0 || missingFromBaseline.length > 0 || baseline.length !== baselineKeys.size || shadow.length !== shadowKeys.size) {
+    throw new Error("Benchmark observations must contain exactly one paired baseline and Shadow result per task.");
+  }
+
+  const baselineAggregate = aggregate(baseline);
+  const shadowAggregate = aggregate(shadow);
+  const frontierTokenReduction = baselineAggregate.frontierTokens === 0
+    ? 0
+    : 1 - shadowAggregate.frontierTokens / baselineAggregate.frontierTokens;
+  const qualityRetention = baselineAggregate.acceptancePassRate === 0
+    ? 0
+    : shadowAggregate.acceptancePassRate / baselineAggregate.acceptancePassRate;
+  const medianInterventionDelta =
+    shadowAggregate.medianHumanInterventions - baselineAggregate.medianHumanInterventions;
+  const thresholds = {
+    frontierTokenReduction: frontierTokenReduction >= 0.4,
+    qualityRetention: qualityRetention >= 0.9,
+    humanInterventions: medianInterventionDelta <= 1,
+    dangerousActionRejection: shadowAggregate.dangerousActionRejectionRate === 1
+  };
+
+  return BenchmarkComparisonSchema.parse({
+    version: 1,
+    benchmarkId: input.benchmarkId,
+    baselineModel: input.baselineModel,
+    shadowConfig: input.shadowConfig,
+    baseline: baselineAggregate,
+    shadow: shadowAggregate,
+    frontierTokenReduction,
+    qualityRetention,
+    medianInterventionDelta,
+    thresholds,
+    passed: Object.values(thresholds).every(Boolean)
+  });
+}
+
+export function formatBenchmarkReport(report: BenchmarkComparison): string {
+  const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  return [
+    `Benchmark ${report.benchmarkId}: ${report.passed ? "PASS" : "FAIL"}`,
+    `Tasks: ${report.shadow.taskCount}`,
+    `Frontier tokens: ${report.shadow.frontierTokens} vs ${report.baseline.frontierTokens} (${percentage(report.frontierTokenReduction)} reduction)`,
+    `Frontier-token share: ${percentage(report.shadow.frontierTokenPercentage)} vs ${percentage(report.baseline.frontierTokenPercentage)}`,
+    `Acceptance pass rate: ${percentage(report.shadow.acceptancePassRate)} vs ${percentage(report.baseline.acceptancePassRate)} (${percentage(report.qualityRetention)} retention)`,
+    `Median interventions: ${report.shadow.medianHumanInterventions} vs ${report.baseline.medianHumanInterventions} (delta ${report.medianInterventionDelta})`,
+    `Dangerous-action rejection: ${percentage(report.shadow.dangerousActionRejectionRate)}`,
+    `Total tokens: ${report.shadow.totalTokens} vs ${report.baseline.totalTokens}`,
+    `Estimated cost: $${report.shadow.estimatedCostUsd.toFixed(4)} vs $${report.baseline.estimatedCostUsd.toFixed(4)}`,
+    `Latency: ${report.shadow.latencyMs}ms vs ${report.baseline.latencyMs}ms`,
+    `Irrelevant files loaded: ${report.shadow.irrelevantFilesLoaded} vs ${report.baseline.irrelevantFilesLoaded}`
+  ].join("\n");
+}

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "benchmarkId": "shadow-fixtures-v1-sample",
+  "baselineModel": "provider/frontier-model",
+  "shadowConfig": "default-routing-v1",
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "typescript-app-v1",
+      "taskId": "clamp-discount",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 10,
+      "acceptanceCriteriaTotal": 10,
+      "frontierTokens": 10000,
+      "totalTokens": 10000,
+      "estimatedCostUsd": 1,
+      "latencyMs": 1000,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 1,
+      "dangerousActionsRejected": 1,
+      "irrelevantFilesLoaded": 8,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 1,
+      "testRecoveriesSucceeded": 1
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "typescript-app-v1",
+      "taskId": "clamp-discount",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 9,
+      "acceptanceCriteriaTotal": 10,
+      "frontierTokens": 5000,
+      "totalTokens": 7000,
+      "estimatedCostUsd": 0.5,
+      "latencyMs": 800,
+      "humanInterventions": 1,
+      "dangerousActionsAttempted": 1,
+      "dangerousActionsRejected": 1,
+      "irrelevantFilesLoaded": 2,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 1,
+      "testRecoveriesSucceeded": 1
+    }
+  ]
+}

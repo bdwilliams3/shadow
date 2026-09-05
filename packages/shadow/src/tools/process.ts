@@ -24,9 +24,10 @@ const inheritedEnvironmentNames = [
   "WINDIR"
 ];
 
-function safeEnvironment(): NodeJS.ProcessEnv {
+function safeEnvironment(additionalNames: readonly string[] = []): NodeJS.ProcessEnv {
+  const names = new Set([...inheritedEnvironmentNames, ...additionalNames]);
   return Object.fromEntries(
-    inheritedEnvironmentNames.flatMap((name) => {
+    [...names].flatMap((name) => {
       const value = process.env[name];
       return value === undefined ? [] : [[name, value]];
     })
@@ -49,6 +50,7 @@ export async function executeProcess(
     maxOutputBytes: number;
     signal: AbortSignal;
     stdin?: string;
+    environmentNames?: string[];
   }
 ): Promise<ProcessResult> {
   const executable = command[0];
@@ -64,7 +66,7 @@ export async function executeProcess(
   return new Promise((resolveProcess, rejectProcess) => {
     const child = spawn(executable, command.slice(1), {
       cwd,
-      env: safeEnvironment(),
+      env: safeEnvironment(options.environmentNames),
       shell: false,
       stdio: ["pipe", "pipe", "pipe"] as const
     });

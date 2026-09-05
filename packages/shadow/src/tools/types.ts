@@ -49,7 +49,10 @@ export interface ActionHandlerContext {
   workspaceRoot: string;
   cwd: string;
   signal: AbortSignal;
-  execute(command: string[], options?: { cwd?: string; stdin?: string }): Promise<ProcessResult>;
+  execute(
+    command: string[],
+    options?: { cwd?: string; stdin?: string; environmentNames?: string[] }
+  ): Promise<ProcessResult>;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

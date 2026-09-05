@@ -109,7 +109,10 @@ export class ActionRunner {
             timeoutMs: manifest.timeoutMs,
             maxOutputBytes: manifest.maxOutputBytes,
             signal: controller.signal,
-            ...(commandOptions.stdin === undefined ? {} : { stdin: commandOptions.stdin })
+            ...(commandOptions.stdin === undefined ? {} : { stdin: commandOptions.stdin }),
+            ...(commandOptions.environmentNames === undefined
+              ? {}
+              : { environmentNames: commandOptions.environmentNames })
           });
         }
       });

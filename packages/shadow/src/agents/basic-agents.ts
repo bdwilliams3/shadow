@@ -16,6 +16,7 @@ import type { GitStatusSummary } from "../tools/actions/git.js";
 import type { PatchResult } from "../tools/actions/patch.js";
 import type { QualityResult } from "../tools/actions/quality.js";
 import type { RepositoryInventory } from "../tools/actions/repository.js";
+import type { DependencyScanResult, SecretScanResult } from "../tools/actions/security.js";
 import type { TestSelection } from "../tools/actions/tests.js";
 
 const noUsage = {
@@ -392,15 +393,26 @@ export class TestAgent implements Agent {
 }
 
 export class ValidateAgent implements Agent {
-  constructor(private readonly actions: ActionRunner) {}
+  constructor(
+    private readonly actions: ActionRunner,
+    private readonly exclusions: string[] = []
+  ) {}
 
   async run(_task: StageTask, context: StageContext): Promise<StageResult> {
-    const [git, typecheck] = await Promise.all([
+    const [git, typecheck, secrets, dependencies] = await Promise.all([
       this.actions.run<GitStatusSummary>("git.status", {}, { dryRun: context.dryRun }),
-      this.actions.run<QualityResult>("quality.typecheck", {}, { dryRun: context.dryRun })
+      this.actions.run<QualityResult>("quality.typecheck", {}, { dryRun: context.dryRun }),
+      this.actions.run<SecretScanResult>("security.secrets", { exclusions: this.exclusions }, {
+        dryRun: context.dryRun
+      }),
+      this.actions.run<DependencyScanResult>("security.dependencies", { exclusions: this.exclusions }, {
+        dryRun: context.dryRun
+      })
     ]);
     const typecheckStatus = typecheck.output?.status;
-    const failed = typecheckStatus === "failed" || typecheck.record.status === "failed";
+    const failed = typecheckStatus === "failed" || typecheck.record.status === "failed" ||
+      (secrets.output?.highConfidenceFindings ?? 0) > 0 || secrets.record.status === "failed" ||
+      dependencies.output?.status === "failed" || dependencies.record.status === "failed";
     const risks: string[] = [];
     if (!git.output?.repository) {
       risks.push("Workspace is not a Git repository; diff-scope validation is unavailable.");
@@ -408,18 +420,36 @@ export class ValidateAgent implements Agent {
     if (typecheckStatus === "not_configured") {
       risks.push("No repository type-check command is configured.");
     }
+    for (const finding of secrets.output?.findings ?? []) {
+      risks.push(`Secret scan ${finding.severity}: ${finding.path}:${finding.line} (${finding.rule}).`);
+    }
+    for (const finding of dependencies.output?.findings ?? []) {
+      risks.push(`Dependency scan ${finding.severity}: ${finding.path}${finding.package ? ` (${finding.package})` : ""} - ${finding.message}`);
+    }
+    if ((dependencies.output?.manifests ?? 0) > 0) {
+      risks.push("Dependency declarations were checked locally, but vulnerability advisories were not queried.");
+    }
 
     return {
       status: failed ? "failed" : "completed",
       summary: failed
-        ? typecheck.record.summary
-        : `Validation inspected ${git.output?.changedFiles.length ?? 0} changed files; ${typecheck.record.summary}`,
+        ? "Validation failed one or more type, secret, or dependency integrity checks."
+        : `Validation inspected ${git.output?.changedFiles.length ?? 0} changed files; ${typecheck.record.summary} ${secrets.record.summary} ${dependencies.record.summary}`,
       decisions: [],
-      artifacts: [...git.artifacts, ...typecheck.artifacts],
+      artifacts: [
+        ...git.artifacts,
+        ...typecheck.artifacts,
+        ...secrets.artifacts,
+        ...dependencies.artifacts
+      ],
       changedFiles: git.output?.changedFiles ?? [],
-      toolCalls: [git.record, typecheck.record],
+      toolCalls: [git.record, typecheck.record, secrets.record, dependencies.record],
       modelCalls: [],
-      testResults: typecheckStatus ? [`typecheck:${typecheckStatus}`] : [],
+      testResults: [
+        ...(typecheckStatus ? [`typecheck:${typecheckStatus}`] : []),
+        `secrets:${secrets.output?.status ?? secrets.record.status}`,
+        `dependencies:${dependencies.output?.status ?? dependencies.record.status}`
+      ],
       openRisks: risks,
       usage: noUsage
     };

@@ -60,11 +60,13 @@ export function planWorkflow(
             : stage === "test"
               ? ["git.status", "tests.select", "mcp.tests.run_tests", "quality.test"]
               : stage === "validate"
-                ? ["git.status", "quality.typecheck"]
+                ? ["git.status", "quality.typecheck", "security.secrets", "security.dependencies"]
+                : stage === "deploy"
+                  ? ["deploy.execute", "deploy.rollback"]
                 : stage === "document"
                   ? ["context.select", "context.verify", "patch.check", "patch.apply"]
                 : [],
-      writePermissions: (stage === "develop" || stage === "document") && !dryRun,
+      writePermissions: (stage === "develop" || stage === "deploy" || stage === "document") && !dryRun,
       acceptanceCriteria,
       budget: config.budgets.stage,
       retryCount: 0

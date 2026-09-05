@@ -73,6 +73,9 @@ export const defaultConfig: ShadowConfig = {
   workspace: {
     exclusions: []
   },
+  deployment: {
+    profiles: {}
+  },
   approvals: {
     allowWorkspaceWrites: true,
     requireApprovalForDestructive: true,

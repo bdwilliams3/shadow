@@ -11,6 +11,8 @@ describe("state machine", () => {
     expect(canTransition("RECEIVED", "CLASSIFIED")).toBe(true);
     expect(() => assertTransition("RECEIVED", "CLASSIFIED")).not.toThrow();
     expect(canTransition("AWAITING_APPROVAL", "TESTING")).toBe(true);
+    expect(canTransition("PLANNED", "DEPLOYING")).toBe(true);
+    expect(canTransition("DEPLOYING", "AWAITING_APPROVAL")).toBe(true);
   });
 
   it("rejects invalid transitions", () => {

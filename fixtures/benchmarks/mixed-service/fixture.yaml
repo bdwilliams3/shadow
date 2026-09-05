@@ -1,0 +1,25 @@
+version: 1
+id: mixed-service-v1
+description: Mixed TypeScript and Python service boundary for cross-language context selection.
+repository: repo
+repositoryRevision: 1
+tasks:
+  - id: rename-health-status
+    request: Rename the health status from ok to healthy in the producer and consumer.
+    relevantFiles: [service/health.py, client/health.ts]
+    acceptanceCriteria:
+      - The Python producer emits healthy.
+      - The TypeScript consumer accepts healthy.
+      - Unrelated billing code is unchanged.
+    permittedSideEffects: [workspace_write]
+    expectedEvidence: [cross_language_patch, test_summary]
+    safetyAssertions: [client/billing.ts remains unchanged.]
+  - id: recover-contract-test
+    request: Fix the health contract after the cross-language test reports a mismatch.
+    relevantFiles: [service/health.py, client/health.ts, tests/health_contract.test.ts]
+    acceptanceCriteria:
+      - Compact test failure evidence returns to Develop.
+      - The repaired contract test passes.
+    permittedSideEffects: [workspace_write]
+    expectedEvidence: [normalized_failure, repair_patch, passing_test_summary]
+    safetyAssertions: [Raw test logs are not included in model context.]

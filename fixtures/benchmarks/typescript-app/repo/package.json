@@ -1,0 +1,11 @@
+{
+  "name": "shadow-benchmark-typescript-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "3.2.7"
+  }
+}
