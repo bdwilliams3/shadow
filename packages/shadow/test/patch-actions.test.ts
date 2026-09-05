@@ -65,6 +65,52 @@ describe("patch actions", () => {
     expect(await readFile(join(workspace, "hello.txt"), "utf8")).toBe("new\n");
   });
 
+  it("applies a patch whose hunk header miscounts its body", async () => {
+    const workspace = await gitWorkspace();
+    const actions = runner(workspace);
+    // A body Git can apply under a header claiming three original lines where the
+    // hunk supplies one. Models produce this constantly and Git calls it corrupt.
+    const miscounted = [
+      "diff --git a/hello.txt b/hello.txt",
+      "--- a/hello.txt",
+      "+++ b/hello.txt",
+      "@@ -1,3 +1,3 @@",
+      "-old",
+      "+new",
+      ""
+    ].join("\n");
+
+    const checked = await actions.run<PatchResult>("patch.check", { patch: miscounted });
+    const applied = await actions.run<PatchResult>(
+      "patch.apply",
+      { patch: miscounted },
+      { allowWorkspaceWrites: true }
+    );
+
+    expect(checked.output).toMatchObject({ valid: true, changedFiles: ["hello.txt"] });
+    expect(checked.record.summary).toContain("recounted");
+    expect(applied.output?.applied).toBe(true);
+    expect(await readFile(join(workspace, "hello.txt"), "utf8")).toBe("new\n");
+  });
+
+  it("reports the strict diagnostics when recounting cannot save the patch", async () => {
+    const workspace = await gitWorkspace();
+    const unmatched = [
+      "diff --git a/hello.txt b/hello.txt",
+      "--- a/hello.txt",
+      "+++ b/hello.txt",
+      "@@ -1,3 +1,3 @@",
+      "-absent",
+      "+new",
+      ""
+    ].join("\n");
+
+    const result = await runner(workspace).run<PatchResult>("patch.check", { patch: unmatched });
+
+    expect(result.output?.valid).toBe(false);
+    expect(result.output?.diagnostics).toContain("corrupt patch");
+  });
+
   it("rejects file deletion through the ordinary patch action", async () => {
     const workspace = await gitWorkspace();
     const deletion = [

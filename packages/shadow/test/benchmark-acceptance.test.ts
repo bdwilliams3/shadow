@@ -45,6 +45,11 @@ describe("deterministic acceptance checks", () => {
       "negative-discount-clamped",
       "excessive-discount-clamped"
     ]);
+    // The reported detail has to name the assertion that broke, not echo the snippet
+    // whose own `throw new Error(...)` also contains the word "error".
+    const negative = before.checks.find((check) => check.id === "negative-discount-clamped");
+    expect(negative?.detail).toContain("Error: negative discount was not clamped");
+    expect(negative?.detail).not.toContain("import {applyDiscount}");
 
     await writeFile(
       join(workspace, "src/discount.ts"),

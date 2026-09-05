@@ -939,7 +939,7 @@ Record these as architecture decision records:
 
 ### Snapshot Metadata
 
-- Last rewritten: 2026-09-05 (afternoon, after benchmark runs 1 and 2).
+- Last rewritten: 2026-09-05 (midday, after benchmark run 5).
 - Implementation shape: runnable cross-phase vertical slice. Phases 0 through 4 are substantially represented, Phase 5 is partially implemented, and Phase 6 has not started. This does not mean every exit criterion in the represented phases is complete.
 - Runtime baseline: Node.js 22.11 or newer, TypeScript 5.x strict ESM, pnpm 10.15.0 workspace, macOS-first.
 - Primary package: `packages/shadow`.
@@ -984,6 +984,9 @@ Record these as architecture decision records:
 - The deterministic runner validates versioned action manifests, uses argument arrays without shell interpolation, constrains working directories, limits runtime and output, propagates cancellation, and stores full bounded output as artifacts. A child that ignores SIGTERM on timeout, cancellation, or output overflow is sent SIGKILL after a five-second grace period.
 - Registered actions cover repository inspection, context selection and verification, Git status, patch checking and application, local test and type-check execution, test selection, deployment and rollback, secret scanning, and dependency-integrity scanning.
 - Policy classes are `read_only`, `workspace_write`, `external_write`, and `destructive`; deployment and external effects require approval by default. Patch actions refuse deletion, symlink mode changes, binary patches, and paths outside the workspace.
+- `patch.check` and `patch.apply` validate strictly first and retry once with `git apply --recount` when the strict pass fails, then hold that flag across every Git invocation for the patch so check, numstat, summary, and apply agree. Context lines must still match the file, so recounting repairs arithmetic, not intent; the check and apply summaries say when it happened, and a patch that still fails reports the strict diagnostics. This is load-bearing, not defensive: `clamp-discount` has drawn the identical wrong `@@ -6,3 +6,11 @@` header from both model tiers in every run where it was observed, and it cost both systems the whole task before the fallback existed.
+- Both patch actions accept OpenAI's `*** Begin Patch` envelope, which the frontier model emits intermittently in place of a unified diff and which `git apply` rejects outright. `apply-patch-envelope.ts` translates it to a unified diff before Git sees it, so every existing guard still runs against a diff and Git stays the only authority on what a patch does. The envelope carries no line numbers, so each hunk is located by matching its own context and removed lines against the workspace file; a hunk matching more than one place is reported rather than guessed at. `Update`, `Add File`, and `Delete File` translate; `Move to` is refused, matching the develop scope's existing rename limitation, and a deletion translates faithfully so the existing deletion guard rejects it with its own message.
+- Translated hunks are padded with real file context. Git sets `match_end` when a hunk has no trailing context, which requires the hunk to match at end of file, so an unpadded mid-file hunk is rejected however correct its line numbers are. Padding produces an ordinary diff rather than reaching for `--unidiff-zero`, which would buy the same result by disabling Git's matching. Hunks closer together than twice the context radius are merged so their padding cannot overlap.
 - Secrets come only from environment variables named in configuration; there is no field for an inline key. Secret scanning reports rule, path, line, and severity only. Dependency scanning is offline and says so.
 - Tests MCP is a local stdio server with Vitest and pytest adapters, bounded raw-log artifacts, normalized failures, polling, cancellation, and local fallback behavior.
 - A GitHub Actions workflow runs install, typecheck, test, and build on macOS.
@@ -995,32 +998,40 @@ Record these as architecture decision records:
 - `benchmark run` removes and re-provisions an isolated committed workspace per task and system, runs Shadow and the single-frontier baseline, reads changed files from Git while ignoring `.shadow/`, `node_modules/`, `dist/`, `build/`, `coverage/`, `.pytest_cache/`, `__pycache__/`, and `.venv/`, scores acceptance, and assembles paired observations. An in-project `--work-root` warns that results will not be hermetic; the default is a temporary directory.
 - The baseline loads the whole discoverable repository and receives the user's request only, exactly as Shadow does. Neither system sees the fixture's acceptance criteria. The baseline has its own generous model-call budget.
 - Observations count distinct irrelevant paths across attempts rather than a per-attempt sum.
+- A failed command check reports the thrown-error line rather than the source echo above it. The previous heuristic matched `error` anywhere, so it printed the checked snippet back — every check contains `throw new Error(...)` — and hid the actual assertion message.
 - `benchmark report` gates on frontier-token reduction (40 percent), criteria retention (90 percent), task-completion retention (90 percent, ADR 0016), median interventions (at most one more), and dangerous-action rejection (100 percent, vacuously met when nothing dangerous was attempted). Comparisons use a tolerance so an exactly-met ratio is not failed by float representation. `Tasks completed` is printed.
 - Real results live under `docs/benchmarks/results/`. Architecture decisions 0001 through 0016 are recorded.
 
 ### Verified State
 
-- `../../node_modules/.bin/vitest run` from `packages/shadow`: 27 test files and 100 tests passed. The suite's per-test timeout is 30 s because its integration tests spawn git, npm, node, and python3; at the 5 s default, two of them failed under a host load average of 52 with no code change.
-- `../../node_modules/.bin/tsc --noEmit -p tsconfig.json` from `packages/shadow`: passed.
-- `../../node_modules/.bin/tsc -p tsconfig.build.json` from `packages/shadow`: passed.
+Verified in this repository on 2026-09-05:
+
+- `../../node_modules/.bin/vitest run` from `packages/shadow`: 28 test files and 112 tests passed. The suite's per-test timeout is 30 s because its integration tests spawn git, npm, node, and python3; at the 5 s default, two of them failed under a host load average of 52 with no code change.
+- `../../node_modules/.bin/tsc --noEmit -p tsconfig.json` and `../../node_modules/.bin/tsc -p tsconfig.build.json` from `packages/shadow`: both passed.
 - Revision-2 fixtures run under `env -i` in a temporary directory with nothing installed: typescript-app passes untouched (exit 0); mixed-service fails untouched (exit 1) on the intended contract mismatch.
-- Real paired benchmark runs against the configured OpenAI models on 2026-09-05, ten observations each:
-  - Run 1 (in-project work root): criteria 10/12 baseline vs 9/12 Shadow; total cost $0.0785 vs $0.1339; report FAIL. Two criteria were false negatives (a Vitest cache scored as a changed file; a fixture that omitted a file the task must touch), one threshold failed on float representation of an exactly-met 0.9, and one task cost Shadow 8,980 tokens across two truncated attempts because Develop could not decline. All four defects are fixed above.
-  - Run 2 (temporary work root): criteria 11/12 vs 11/12; tasks completed 3/5 vs 2/5; total cost $0.0709 vs $0.0720; report printed PASS under the old gate and is FAIL under ADR 0016. Shadow was cheaper on every task it completed cleanly (−65%, −33%, −83%) and lost only on the two that retried: a missing Vitest binary misread as a failing test and remediated, and a Develop decline triggered by boilerplate acceptance criteria. Both are fixed above. Saved as `docs/benchmarks/results/2026-09-05-shadow-fixtures-v1-run2.json`.
-- A third invocation, started ~10:29 with an in-project work root, never returned. Diagnosis: one TCP socket to Cloudflare in front of `api.openai.com` in state CLOSED, no child processes, 0.0 percent CPU. The provider closed the connection and the transport had no deadline. Fixed as noted above; the process itself was left for the operator to end.
-- Both runs show Shadow spending zero frontier tokens. The 100 percent reduction that produces is vacuous: on these fixtures no stage that calls a model is mapped to the frontier tier.
-- Repository self-scan: no high-confidence secrets; one warning-level credential assignment in an intentional test fixture; no dependency-integrity findings.
+- Repository self-scan across 128 files: no high-confidence secrets; one warning-level credential assignment in an intentional test fixture; no dependency-integrity findings, and no advisory database was queried.
+- The Develop decline path works against a live model. On `reject-output-delete` Shadow returned an empty patch reading "The request requires deletion outside the workspace, which is not permitted" and blocked the run in one model call: 627 tokens and 1.5 s, its cheapest task and 85 percent under the baseline, which has no decline path and spent 910 tokens and 10.4 s failing instead.
+
+Benchmark run 5 is the current result and the one to quote (2026-09-05 ~11:40, default temporary work root, ten paired observations, saved as `docs/benchmarks/results/2026-09-05-shadow-fixtures-v1-run5.json`):
+
+- Criteria 11/12 for both systems; tasks completed 60 percent for both; median interventions 0 for both; dangerous-action rejection 100 percent; report PASS.
+- Total tokens 4,839 Shadow vs 4,003 baseline; cost $0.0229 vs $0.0508; latency 20.5 s vs 31.6 s; irrelevant files 8 vs 8.
+- Shadow was cheaper on all five tasks (−49%, −85%, −55%, −39%, −27%) and faster on four. Cost and latency are the only dimensions still separating the systems; the quality dimensions are saturated, as recorded under Still Missing.
+- The recount fallback fired once, on Shadow's `clamp-discount` patch; the baseline counted correctly that time and no system emitted an `apply_patch` envelope. Both repairs are intermittent, which is the argument for keeping them in the shared actions where neither system gains from them.
+- Shadow spent zero frontier tokens, as in every run so far. The 100 percent reduction that produces is vacuous: on these fixtures no stage that calls a model is mapped to the frontier tier.
+
+Runs 1 through 4 are superseded and their headline numbers should not be quoted. Each turned on a defect since fixed and covered by a test: two harness false negatives, a threshold failing on the float representation of an exactly-met 0.9, a missing test binary misread as a failing test, a Develop decline triggered by boilerplate acceptance criteria, a transport with no request deadline, miscounted hunk headers, and the `apply_patch` envelope. Runs 2 and 4 are kept under `docs/benchmarks/results/` as evidence for those defects, not as results.
 
 ### Still Missing
 
 #### Product-Critical Gaps
 
-- No benchmark run has yet been executed with all of the above fixes in place. Run 3 is the first that can be trusted, and it has not happened.
 - Plan makes no model call. §8 specifies it as the most frontier-worthy stage; today it runs `repository.inspect` and returns three fixed strings, and the stage graph is chosen by regex. Consequently `agents.plan: frontier` has no effect, `shadow models` prints a mapping for a stage that never calls a model (as it does for `test`, `validate`, and `deploy`), and stage tasks have no real acceptance criteria.
 - Design has a model call but is dormant: the planner includes it only for deploy and new-project requests.
 - New-project creation is not implemented end to end.
 - Develop and Document cannot delete, rename, or produce binary changes; patch conflicts have no remediation beyond a bounded retry. Document edits only selected existing documentation files.
 - The interactive terminal is a basic readline loop, not the Ink interface in the product plan.
+- The fixtures no longer discriminate on quality. In run 5 both systems passed every criterion the harness can evaluate, the only unpassed one being `recover-contract-test`'s unevaluated criterion. Acceptance and task completion are saturated at 11/12 and cannot register an improvement from the Plan stage or anything else. Separating the systems on correctness needs harder fixtures: multi-file changes, a task where whole-repository context actively misleads, or a decline that turns on something subtler than an explicit delete request.
 
 #### Configuration and First Run
 
@@ -1045,13 +1056,12 @@ Record these as architecture decision records:
 
 #### Evaluation Gaps
 
-- On the refusal task, the model did not use the decline path: it produced a patch that failed validation, then truncated. The decline prompt was strengthened after run 2 but has not been exercised against a live model.
 - `recover-contract-test` still carries one unevaluated criterion, "Compact test failure evidence returns to Develop". It describes harness behavior rather than a task outcome, and scoring it would bias retention toward Shadow; it needs rewording or removal.
 - Provisioned workspaces are only hermetic when the work root is outside the project; this is warned about, not solved.
 - `safetyAssertions` remain descriptive. End-to-end coverage is missing for new-project creation, token-budget approval, Tests MCP outage during a run, dangerous ad hoc command rejection, and installation on a clean Mac.
 
 ### Highest-Priority Next Step
 
-Execute benchmark run 3 with the current code and revision-2 fixtures, using the default temporary work root, and check the observations in under `docs/benchmarks/results/`. Runs 1 and 2 each exposed harness defects that invalidated their headline numbers; every defect found is now fixed and covered by a test, so run 3 is the first result that can be read at face value. Expect the report to show Shadow cheaper on every cleanly completed task, task completion at or near parity, and a still-vacuous 100 percent frontier-token reduction.
+Implement the model-backed Plan stage from §8. It is the largest unimplemented piece of the specification, it is what gives stage tasks real acceptance criteria, and it is what makes the frontier tier — and therefore the benchmark's central number — mean something. Today Plan runs `repository.inspect`, returns three fixed strings, and picks the stage graph by regex, so `agents.plan: frontier` has no effect and the 100 percent frontier-token reduction measures nothing.
 
-After that, implement the model-backed Plan stage from §8. It is the largest unimplemented piece of the specification, it is what gives stage tasks real acceptance criteria, and it is what makes the frontier tier — and therefore the benchmark's central number — mean something.
+Expect it to cost the headline number rather than improve it: routing Plan to the frontier tier is what finally puts frontier tokens on Shadow's side of the ledger, and the 40 percent reduction gate will then be measuring a real ratio for the first time. Run 5 is the baseline to compare against — quote its cost and latency, not its acceptance, which is saturated. Budget for the fixtures needing to get harder before Plan's value shows up in anything but cost.

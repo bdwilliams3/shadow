@@ -1,6 +1,11 @@
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import type { ActionDefinition, ActionHandlerContext, ProcessResult } from "../types.js";
+import {
+  ApplyPatchEnvelopeError,
+  looksLikeApplyPatchEnvelope,
+  translateApplyPatchEnvelope
+} from "./apply-patch-envelope.js";
 
 const PatchInputSchema = z.object({
   patch: z.string().min(1).max(500_000)
@@ -61,27 +66,100 @@ function failed(result: ProcessResult): boolean {
   return result.exitCode !== 0 || result.timedOut || result.outputLimitExceeded;
 }
 
-async function checkPatch(
-  patch: string,
-  context: ActionHandlerContext
-): Promise<{
+interface PatchCheck {
   check: ProcessResult;
   numstat?: ProcessResult;
   changedFiles: string[];
   createdFiles: string[];
-}> {
-  const checkCommand = ["git", "apply", "--check", "--whitespace=error-all", "-"];
-  const check = await context.execute(checkCommand, { stdin: patch });
-  if (failed(check)) {
-    return { check, changedFiles: [], createdFiles: [] };
+  /** True when Git had to derive the hunk line counts to read the patch at all. */
+  recounted: boolean;
+  /** True when the input was an `apply_patch` envelope translated to a unified diff. */
+  translated: boolean;
+  /** The diff Git actually saw. Differs from the input only when it was translated. */
+  effectivePatch: string;
+}
+
+/** A refusal that never ran a command, shaped so the ordinary failure path can report it. */
+function syntheticFailure(command: string[], message: string): ProcessResult {
+  return { command, exitCode: 1, stdout: "", stderr: message, timedOut: false, outputLimitExceeded: false };
+}
+
+/**
+ * Models routinely emit a hunk body whose context and edits are exactly right above an
+ * `@@ -a,b +c,d @@` header whose counts are wrong; Git then rejects the entire patch as
+ * corrupt. `--recount` derives the counts from the body instead of trusting the header.
+ * Context lines must still match the file, so this repairs arithmetic, never intent, and
+ * every Git invocation for one patch has to agree on the flag or apply would disagree
+ * with check.
+ */
+function recountArgs(recounted: boolean): string[] {
+  return recounted ? ["--recount"] : [];
+}
+
+async function checkPatch(
+  rawPatch: string,
+  context: ActionHandlerContext
+): Promise<PatchCheck> {
+  let patch = rawPatch;
+  let translated = false;
+  // Frontier models emit OpenAI's `*** Begin Patch` envelope in place of a unified diff
+  // often enough to lose whole tasks on format alone. Translating before Git sees it
+  // keeps every downstream guard — deletion, symlink, binary, scope — working on a diff.
+  if (looksLikeApplyPatchEnvelope(rawPatch)) {
+    try {
+      // Git resolves patch paths against the cwd it runs in, so translation must read
+      // the same files Git will write. The runner has already bounded cwd to the workspace.
+      patch = (await translateApplyPatchEnvelope(rawPatch, context.cwd)).patch;
+      translated = true;
+    } catch (error) {
+      if (!(error instanceof ApplyPatchEnvelopeError)) {
+        throw error;
+      }
+      return {
+        check: syntheticFailure(["apply-patch-envelope"], `${error.message}\n`),
+        changedFiles: [],
+        createdFiles: [],
+        recounted: false,
+        translated: false,
+        effectivePatch: rawPatch
+      };
+    }
   }
-  const numstatCommand = ["git", "apply", "--numstat", "-z", "-"];
+  const checkCommand = (args: string[]): string[] => [
+    "git",
+    "apply",
+    "--check",
+    ...args,
+    "--whitespace=error-all",
+    "-"
+  ];
+  const strict = await context.execute(checkCommand([]), { stdin: patch });
+  let check = strict;
+  let recounted = false;
+  if (failed(strict)) {
+    const retried = await context.execute(checkCommand(["--recount"]), { stdin: patch });
+    if (failed(retried)) {
+      // Report the strict diagnostics: they describe the patch as the model wrote it.
+      return {
+        check: strict,
+        changedFiles: [],
+        createdFiles: [],
+        recounted: false,
+        translated,
+        effectivePatch: patch
+      };
+    }
+    check = retried;
+    recounted = true;
+  }
+  const args = recountArgs(recounted);
+  const numstatCommand = ["git", "apply", "--numstat", "-z", ...args, "-"];
   const numstat = await context.execute(numstatCommand, { stdin: patch });
   const changedFiles = failed(numstat) ? [] : parseNumstat(numstat.stdout);
   if (!safeChangedFiles(changedFiles)) {
     throw new Error("Patch contains a path outside the workspace.");
   }
-  const summaryCommand = ["git", "apply", "--summary", "-"];
+  const summaryCommand = ["git", "apply", "--summary", ...args, "-"];
   const summary = await context.execute(summaryCommand, { stdin: patch });
   const forbiddenChange = /(?:delete mode|mode 120000|binary patch)/i.test(
     `${summary.stdout}\n${summary.stderr}\n${patch.includes("GIT binary patch") ? "binary patch" : ""}`
@@ -91,13 +169,33 @@ async function checkPatch(
       check: { ...check, exitCode: 1, stderr: "File deletion, symlink changes, and binary patches require a separate approved action." },
       numstat,
       changedFiles,
-      createdFiles: []
+      createdFiles: [],
+      recounted,
+      translated,
+      effectivePatch: patch
     };
   }
   if (failed(summary)) {
-    return { check: summary, numstat, changedFiles, createdFiles: [] };
+    return { check: summary, numstat, changedFiles, createdFiles: [], recounted, translated, effectivePatch: patch };
   }
-  return { check, numstat, changedFiles, createdFiles: parseCreatedFiles(summary.stdout) };
+  return {
+    check,
+    numstat,
+    changedFiles,
+    createdFiles: parseCreatedFiles(summary.stdout),
+    recounted,
+    translated,
+    effectivePatch: patch
+  };
+}
+
+/** Describes any repair the actions had to perform, for the caller-visible summary. */
+function repairNote(result: Pick<PatchCheck, "recounted" | "translated">): string {
+  const repairs = [
+    result.translated ? "an apply_patch envelope translated to a unified diff" : "",
+    result.recounted ? "malformed hunk line counts recounted" : ""
+  ].filter(Boolean);
+  return repairs.length > 0 ? ` Repaired: ${repairs.join("; ")}.` : "";
 }
 
 export const patchCheckAction: ActionDefinition<z.infer<typeof PatchInputSchema>, PatchResult> = {
@@ -127,7 +225,7 @@ export const patchCheckAction: ActionDefinition<z.infer<typeof PatchInputSchema>
     const diagnostics = [result.check.stderr, result.numstat?.stderr ?? ""].filter(Boolean).join("\n");
     return {
       summary: valid
-        ? `Patch is valid and affects ${result.changedFiles.length} files.`
+        ? `Patch is valid and affects ${result.changedFiles.length} files.` + repairNote(result)
         : "Patch validation failed.",
       output: {
         valid,
@@ -181,12 +279,18 @@ export const patchApplyAction: ActionDefinition<z.infer<typeof PatchInputSchema>
         stderr: diagnostics
       };
     }
-    const command = ["git", "apply", "--whitespace=error-all", "-"];
-    const applied = await context.execute(command, { stdin: input.patch });
+    const command = [
+      "git",
+      "apply",
+      ...recountArgs(checked.recounted),
+      "--whitespace=error-all",
+      "-"
+    ];
+    const applied = await context.execute(command, { stdin: checked.effectivePatch });
     const success = !failed(applied);
     return {
       summary: success
-        ? `Applied patch affecting ${checked.changedFiles.length} files.`
+        ? `Applied patch affecting ${checked.changedFiles.length} files.` + repairNote(checked)
         : "Patch application failed.",
       output: {
         valid: true,

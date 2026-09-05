@@ -65,8 +65,13 @@ async function runCommandCheck(
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    // Prefer the error line over the source echo tools print above it.
-    const diagnostic = lines.find((line) => /error/i.test(line)) ?? lines.slice(0, 2).join(" ");
+    // Prefer the thrown-error line over the source echo tools print above it. Matching
+    // "error" anywhere picks the echo instead whenever the checked snippet itself says
+    // `throw new Error(...)`, which is how nearly every command check is written.
+    const diagnostic =
+      lines.find((line) => /^(?:[A-Za-z_$][\w$]*)?Error(?: \[[^\]]+\])?:/.test(line)) ??
+      lines.find((line) => /error/i.test(line)) ??
+      lines.slice(0, 2).join(" ");
     return {
       id: check.id,
       criterion: check.criterion,
