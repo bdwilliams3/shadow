@@ -7,6 +7,7 @@ coverage/
 .shadow/shadow.db
 .shadow/shadow.db-shm
 .shadow/shadow.db-wal
+.shadow/benchmark*
 .DS_Store
 *.log
 .vscode/
