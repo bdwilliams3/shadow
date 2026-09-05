@@ -1,0 +1,5 @@
+allowWorkspaceWrites: true
+requireApprovalForDestructive: true
+requireApprovalForExternalWrites: true
+requireApprovalForNetwork: false
+requireApprovalForDeploy: true

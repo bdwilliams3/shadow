@@ -1,0 +1,69 @@
+version: 1
+providers:
+  default:
+    kind: openai-compatible
+    baseUrl: https://api.openai.com/v1
+    apiKeyEnv: OPENAI_API_KEY
+models:
+  frontier:
+    provider: default
+    model: frontier
+    maxOutputTokens: 12000
+  balanced:
+    provider: default
+    model: balanced
+    maxOutputTokens: 6000
+  economy:
+    provider: default
+    model: economy
+    maxOutputTokens: 3000
+agents:
+  plan: frontier
+  design: frontier
+  develop: balanced
+  test: economy
+  validate: balanced
+  deploy: economy
+  document: economy
+budgets:
+  run:
+    maxInputTokens: 120000
+    maxOutputTokens: 24000
+    maxTotalTokens: 144000
+    maxEstimatedCostUsd: 10
+    reservedFrontierTokens: 20000
+  stage:
+    maxInputTokens: 40000
+    maxOutputTokens: 8000
+    maxTotalTokens: 48000
+    maxEstimatedCostUsd: 3
+    reservedFrontierTokens: 4000
+  modelCall:
+    maxInputTokens: 20000
+    maxOutputTokens: 4000
+    maxTotalTokens: 24000
+    maxEstimatedCostUsd: 1
+    reservedFrontierTokens: 0
+lifecycle:
+  enabledStages:
+    - plan
+    - design
+    - develop
+    - test
+    - validate
+    - deploy
+    - document
+  maxStageRetries: 1
+  maxModelCallsPerStage: 3
+approvals:
+  allowWorkspaceWrites: true
+  requireApprovalForDestructive: true
+  requireApprovalForExternalWrites: true
+  requireApprovalForNetwork: false
+  requireApprovalForDeploy: true
+persistence:
+  runsDir: .shadow/runs
+  artifactsDir: .shadow/artifacts
+telemetry:
+  localOnly: true
+  remoteEnabled: false

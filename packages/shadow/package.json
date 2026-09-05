@@ -1,0 +1,31 @@
+{
+  "name": "@shadow/shadow",
+  "version": "0.1.0",
+  "description": "Local coding-agent harness with lifecycle orchestration and token-aware routing.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "bin": {
+    "shadow": "./dist/cli/index.js",
+    "shadow-tests-mcp": "./dist/mcp/tests/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "commander": "^14.0.0",
+    "fast-xml-parser": "5.2.5",
+    "minimatch": "10.0.3",
+    "typescript": "5.9.2",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.5"
+  }
+}

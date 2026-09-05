@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.shadow/runs/
+.shadow/artifacts/
+.shadow/test-runs/
+.shadow/shadow.db
+.shadow/shadow.db-shm
+.shadow/shadow.db-wal
+.DS_Store
+*.log
+.vscode/
+.vscode/*
