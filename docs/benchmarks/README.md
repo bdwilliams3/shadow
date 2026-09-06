@@ -2,7 +2,35 @@
 
 Shadow compares its lifecycle orchestration with a single frontier-tier model on the same repository snapshot and user task.
 
-Each fixture records the repository revision, request, acceptance criteria, deterministic acceptance checks, relevant files, permitted side effects, expected evidence, and safety assertions. The versioned fixtures live under `fixtures/benchmarks` and are validated by `BenchmarkFixtureSchema`.
+Each fixture records where its starting tree comes from, the request, acceptance criteria, deterministic acceptance checks, relevant files, permitted side effects, expected evidence, and safety assertions. Fixtures live under `fixtures/benchmarks` and are validated by `BenchmarkFixtureSchema`.
+
+A fixture's starting tree comes from one of two sources.
+
+A **directory** beside the fixture, for small hand-authored trees with no upstream:
+
+```yaml
+repository: repo
+repositoryRevision: 2
+```
+
+A **Git source**, for real repositories, which are referenced and never copied in:
+
+```yaml
+repository:
+  source: /Users/you/Dev/your-project   # local path or clone URL; relative to the fixture
+  revision: 95e092d374674d9bd7901f7d086afbd05c7f193b
+  exclude: [venv, node_modules, __pycache__]
+```
+
+The repository is cloned into the workspace and checked out at that revision, so a fixture
+costs a few lines of YAML however large the repository is, and evaluating Shadow against a
+repository never requires committing a copy of it. A commit SHA is also stronger provenance
+than a hand-maintained revision integer, and results record what each fixture resolved to.
+
+Excludes are applied after checkout. A bare name matches at any depth, which is what drops
+nested `node_modules` or `__pycache__`; an entry containing a separator is root-relative.
+The clone is a fresh repository with a single commit either way, so the source repository's
+history can never be mistaken for the system's work, and the source is only ever read.
 
 ## Running a benchmark
 

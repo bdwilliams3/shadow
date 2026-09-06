@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { executeBenchmark, formatBenchmarkExecution } from "../src/benchmarks/executor.js";
+import { applyExcludes, executeBenchmark, formatBenchmarkExecution } from "../src/benchmarks/executor.js";
 import { buildBenchmarkReport } from "../src/benchmarks/report.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { ModelProvider } from "../src/models/provider.js";
@@ -380,5 +380,39 @@ describe("benchmark executor", () => {
     expect(baseline?.changedFiles).toEqual([]);
     expect(baseline?.observation.succeeded).toBe(false);
     expect(baseline?.observation.acceptanceCriteriaPassed).toBe(0);
+  });
+});
+
+describe("fixture excludes", () => {
+  it("drops nested directories by name and root paths by position", async () => {
+    const root = await mkdtemp(join(tmpdir(), "shadow-excludes-"));
+    await mkdir(join(root, "src/core/__pycache__"), { recursive: true });
+    await mkdir(join(root, "packages/app/node_modules"), { recursive: true });
+    await mkdir(join(root, "build"), { recursive: true });
+    await mkdir(join(root, "src/build"), { recursive: true });
+    await writeFile(join(root, "src/core/__pycache__/a.pyc"), "x", "utf8");
+    await writeFile(join(root, "packages/app/node_modules/b.js"), "x", "utf8");
+    await writeFile(join(root, "build/out.js"), "x", "utf8");
+    await writeFile(join(root, "src/build/kept.js"), "x", "utf8");
+    await writeFile(join(root, "src/core/keep.py"), "x", "utf8");
+
+    await applyExcludes(root, ["__pycache__", "node_modules", "build/"]);
+
+    const survivors = new Set<string>();
+    const walk = async (dir: string, prefix = ""): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) await walk(join(dir, entry.name), rel);
+        else survivors.add(rel);
+      }
+    };
+    await walk(root);
+
+    // Bare names match at any depth; a path with a separator is root-relative only.
+    expect(survivors.has("src/core/keep.py")).toBe(true);
+    expect(survivors.has("src/core/__pycache__/a.pyc")).toBe(false);
+    expect(survivors.has("packages/app/node_modules/b.js")).toBe(false);
+    expect(survivors.has("build/out.js")).toBe(false);
+    expect(survivors.has("src/build/kept.js")).toBe(true);
   });
 });

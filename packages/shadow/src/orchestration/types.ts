@@ -124,7 +124,7 @@ export type StageTask = z.infer<typeof StageTaskSchema>;
  */
 export const PlannedStageTaskSchema = z.object({
   stage: StageNameSchema,
-  goal: z.string().min(1),
+  goal: z.string(),
   acceptanceCriteria: z.array(z.string().min(1)).default([]),
   /**
    * A capability tier the plan believes this stage needs. Honoured only when it is at or
@@ -138,8 +138,7 @@ export type PlannedStageTask = z.infer<typeof PlannedStageTaskSchema>;
 export const PlanRevisionSchema = z.object({
   stages: z.array(StageNameSchema).min(1),
   tasks: z.array(PlannedStageTaskSchema).default([]),
-  unknowns: z.array(z.string()).default([]),
-  approvalsRequired: z.array(z.string()).default([])
+  risks: z.array(z.string()).default([])
 });
 export type PlanRevision = z.infer<typeof PlanRevisionSchema>;
 

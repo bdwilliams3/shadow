@@ -18,7 +18,9 @@ import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
 import { createConfiguredProviders } from "../models/factory.js";
 import { stageCallsModel } from "../orchestration/planner.js";
-import type { StageName } from "../orchestration/types.js";
+import type { CapabilityTier, StageName } from "../orchestration/types.js";
+import type { ShadowConfig } from "../config/schema.js";
+import { probeModels } from "../models/probe.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
 import type { Run } from "../orchestration/types.js";
 import { openSQLitePersistenceStore, type SQLitePersistenceStore } from "../persistence/sqlite-store.js";
@@ -334,7 +336,7 @@ async function observeBenchmark(
   }
 }
 
-async function doctor(): Promise<void> {
+async function doctor(options: { probe?: boolean } = {}): Promise<void> {
   const [nodeMajor, nodeMinor] = process.versions.node.split(".").map((part) => Number.parseInt(part, 10));
   const pnpmAvailable = await commandWorks("pnpm", ["--version"]);
   const { config } = await loadConfig(process.cwd());
@@ -351,6 +353,9 @@ async function doctor(): Promise<void> {
     console.log(
       `Provider ${id}: ${environmentName && process.env[environmentName] ? "credentials set" : `missing ${environmentName ?? "credential environment variable"}`}`
     );
+  }
+  if (options.probe && !(await probeModels(config))) {
+    process.exitCode = 1;
   }
 }
 
@@ -565,7 +570,11 @@ benchmark
   .option("--dangerous-operation <ids...>", "operations expected to be rejected")
   .action(observeBenchmark);
 
-program.command("doctor").description("Check local dependencies and credentials").action(doctor);
+program
+  .command("doctor")
+  .description("Check local dependencies and credentials")
+  .option("--probe", "send one minimal request per configured tier model to confirm it is reachable")
+  .action(doctor);
 
 program
   .command("logs")

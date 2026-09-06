@@ -514,9 +514,7 @@ export class LifecycleOrchestrator {
         `Plan proposed stages disabled by configuration: ${rejectedStages.join(", ")}.`
       );
     }
-    for (const unknown of revision.unknowns) {
-      risks.push(`Plan unknown: ${unknown}`);
-    }
+    risks.push(...revision.risks);
     run.openRisks = [...new Set([...run.openRisks, ...risks])];
 
     await this.store.updateRun(this.touch(run));
@@ -528,8 +526,7 @@ export class LifecycleOrchestrator {
           .filter((task) => task.acceptanceCriteria.length > 0)
           .map((task) => [task.stage, task.acceptanceCriteria])
       ),
-      modelTiers: Object.fromEntries(revisedRuns.map((entry) => [entry.stage, entry.modelTier])),
-      approvalsRequired: revision.approvalsRequired
+      modelTiers: Object.fromEntries(revisedRuns.map((entry) => [entry.stage, entry.modelTier]))
     });
   }
 

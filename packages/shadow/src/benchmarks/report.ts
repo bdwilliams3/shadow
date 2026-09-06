@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CapabilityTierSchema, type CapabilityTier } from "../orchestration/types.js";
 
 export const BenchmarkObservationSchema = z.object({
   system: z.enum(["baseline", "shadow"]),
@@ -57,6 +58,19 @@ export const BenchmarkReportInputSchema = z.object({
   benchmarkId: z.string().min(1),
   baselineModel: z.string().min(1),
   shadowConfig: z.string().min(1),
+  /**
+   * What each capability tier resolved to when the run was taken. Optional so runs
+   * recorded before this field still parse. Tiers deliberately collapsed onto one model
+   * make every cost figure and every ratio between tiers synthetic, and this is what lets
+   * the output say so instead of leaving a future reader to quote fiction.
+   */
+  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
+  /**
+   * Fixture id to repository revision, as provisioned for this run. Optional so earlier
+   * results still parse. Committing the fixture corpus is what makes a saved number
+   * reproducible, and that only works if the number says which revision it came from.
+   */
+  fixtureRevisions: z.record(z.string(), z.string().min(1)).optional(),
   observations: z.array(BenchmarkObservationSchema).min(2)
 });
 export type BenchmarkReportInput = z.infer<typeof BenchmarkReportInputSchema>;
@@ -82,6 +96,8 @@ const AggregateSchema = z.object({
 export const BenchmarkComparisonSchema = z.object({
   version: z.literal(1),
   benchmarkId: z.string().min(1),
+  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
+  fixtureRevisions: z.record(z.string(), z.string().min(1)).optional(),
   baselineModel: z.string().min(1),
   shadowConfig: z.string().min(1),
   baseline: AggregateSchema,
@@ -166,6 +182,7 @@ export const BenchmarkSummarySchema = z.object({
   version: z.literal(1),
   benchmarkId: z.string().min(1),
   system: z.enum(["baseline", "shadow"]),
+  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
   totals: AggregateSchema
 });
 export type BenchmarkSummary = z.infer<typeof BenchmarkSummarySchema>;
@@ -195,14 +212,41 @@ export function buildBenchmarkSummary(rawInput: unknown, system?: "baseline" | "
     version: 1,
     benchmarkId: input.benchmarkId,
     system: chosen,
+    ...(input.tierModels ? { tierModels: input.tierModels } : {}),
     totals: aggregate(observations)
   });
+}
+
+/**
+ * The tier table a run was taken under, as one line. Always shown when recorded: which
+ * model each tier resolved to is provenance for the numbers, and the table is a knob
+ * users are expected to turn — swapping models per tier is the point of it, not a
+ * condition to flag.
+ */
+export function formatFixtureRevisions(
+  revisions: Record<string, string> | undefined
+): string | undefined {
+  if (!revisions) return undefined;
+  const entries = Object.entries(revisions).map(([id, revision]) => `${id}@${revision}`);
+  return entries.length > 0 ? `Fixtures: ${entries.join(", ")}` : undefined;
+}
+
+export function formatTierModels(
+  tierModels: Partial<Record<CapabilityTier, string>> | undefined
+): string | undefined {
+  if (!tierModels) return undefined;
+  const entries = (["frontier", "balanced", "economy"] as const)
+    .filter((tier) => tierModels[tier])
+    .map((tier) => `${tier}=${tierModels[tier]}`);
+  return entries.length > 0 ? `Tiers: ${entries.join(", ")}` : undefined;
 }
 
 export function formatBenchmarkSummary(summary: BenchmarkSummary): string {
   const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
   const totals = summary.totals;
+  const tiers = formatTierModels(summary.tierModels);
   return [
+    ...(tiers ? [tiers] : []),
     `Benchmark ${summary.benchmarkId}: ${summary.system} only (no comparison)`,
     `Tasks: ${totals.taskCount}`,
     `Frontier tokens: ${totals.frontierTokens} (${percentage(totals.frontierTokenPercentage)} of total)`,
@@ -260,6 +304,8 @@ export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
   return BenchmarkComparisonSchema.parse({
     version: 1,
     benchmarkId: input.benchmarkId,
+    ...(input.tierModels ? { tierModels: input.tierModels } : {}),
+    ...(input.fixtureRevisions ? { fixtureRevisions: input.fixtureRevisions } : {}),
     baselineModel: input.baselineModel,
     shadowConfig: input.shadowConfig,
     baseline: baselineAggregate,
@@ -275,7 +321,11 @@ export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
 
 export function formatBenchmarkReport(report: BenchmarkComparison): string {
   const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  const tiers = formatTierModels(report.tierModels);
+  const fixtures = formatFixtureRevisions(report.fixtureRevisions);
   return [
+    ...(fixtures ? [fixtures] : []),
+    ...(tiers ? [tiers] : []),
     `Benchmark ${report.benchmarkId}: ${report.passed ? "PASS" : "FAIL"}`,
     `Tasks: ${report.shadow.taskCount}`,
     `Frontier tokens: ${report.shadow.frontierTokens} vs ${report.baseline.frontierTokens} (${percentage(report.frontierTokenReduction)} reduction)`,

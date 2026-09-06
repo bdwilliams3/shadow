@@ -59,13 +59,48 @@ export const BenchmarkTaskSchema = z.object({
 });
 export type BenchmarkTask = z.infer<typeof BenchmarkTaskSchema>;
 
+/**
+ * Where a fixture's starting tree comes from.
+ *
+ * `source` is a Git repository — a local path or a clone URL — and `revision` is anything
+ * `git rev-parse` accepts, though a full SHA is what makes a result reproducible. The
+ * repository is cloned into the workspace and checked out at that revision, so a fixture
+ * costs a few lines of YAML no matter how large the repository is.
+ *
+ * This exists because the alternative does not scale: a harness meant to run against any
+ * repository cannot require a committed copy of every repository it is evaluated on. Git
+ * is already a content-addressed store of exactly the thing a fixture needs, and a commit
+ * SHA is stronger provenance than a hand-maintained revision integer.
+ */
+export const GitRepositorySourceSchema = z.object({
+  source: z.string().min(1),
+  revision: z.string().min(1),
+  /** Paths to drop after checkout: vendored trees, build output, large binaries. */
+  exclude: z.array(z.string().min(1)).default([])
+});
+export type GitRepositorySource = z.infer<typeof GitRepositorySourceSchema>;
+
 export const BenchmarkFixtureSchema = z.object({
   version: z.literal(1),
   id: z.string().min(1),
   description: z.string().min(1),
-  repository: z.string().min(1),
-  repositoryRevision: z.number().int().positive(),
+  /**
+   * Either a directory beside the fixture whose contents are the starting tree, or a Git
+   * source. The directory form suits small hand-authored trees that have no upstream; the
+   * Git form suits real repositories, which should never be copied in.
+   */
+  repository: z.union([z.string().min(1), GitRepositorySourceSchema]),
+  /** Required only for the directory form, where nothing else identifies the contents. */
+  repositoryRevision: z.number().int().positive().optional(),
   tasks: z.array(BenchmarkTaskSchema).min(1)
+}).superRefine((fixture, context) => {
+  if (typeof fixture.repository === "string" && fixture.repositoryRevision === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["repositoryRevision"],
+      message: "a directory repository must declare repositoryRevision"
+    });
+  }
 });
 export type BenchmarkFixture = z.infer<typeof BenchmarkFixtureSchema>;
 

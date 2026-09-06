@@ -5,10 +5,20 @@ providers:
     baseUrl: https://api.openai.com/v1
     apiKeyEnv: OPENAI_API_KEY
 models:
-  # Prices are USD per 1M tokens, checked 2026-09-05 against
-  # https://developers.openai.com/api/docs/pricing
-  # gpt-5.6-sol carries promotional pricing at least through 2026-11-21; re-check
-  # before quoting any cost figure from a benchmark report generated after that.
+  # Tier -> model. This is the knob: set each tier to whatever model you want to test
+  # with, independently. Tiers may share a model; that is an ordinary configuration, not
+  # a special mode. Output ceilings and prices are per-tier, so budget, reserve, and
+  # routing logic behave differently even when the models are identical.
+  #
+  # Prices are USD per 1M tokens and are yours to set — they drive budget checks and the
+  # reported cost figures, so they are only as accurate as what you put here.
+  #
+  # Production values, checked 2026-09-05 against
+  # https://developers.openai.com/api/docs/pricing (frontier price promotional at least
+  # through 2026-11-21):
+  #   frontier gpt-5.6-sol   $4.00 / $20.00
+  #   balanced gpt-5.6-terra $2.00 / $12.00
+  #   economy  gpt-5.6-luna  $0.20 / $1.20
   frontier:
     provider: default
     model: gpt-5.6-sol
@@ -17,41 +27,20 @@ models:
     outputCostPerMillionTokens: 20.00
   balanced:
     provider: default
-    model: gpt-5.6-terra
+    model: gpt-5.5
     maxOutputTokens: 6000
     inputCostPerMillionTokens: 2.00
     outputCostPerMillionTokens: 12.00
   economy:
     provider: default
-    model: gpt-5.6-luna
+    model: gpt-5.4-mini
     maxOutputTokens: 3000
     inputCostPerMillionTokens: 0.20
     outputCostPerMillionTokens: 1.20
 agents:
-  # BRING-UP WINDOW: nothing may reach the `frontier` tier while the model-backed Plan
-  # stage is being validated. Plan must produce correct stage graphs and acceptance
-  # criteria across several green benchmark runs first, and a plan revision can now *add*
-  # stages to the graph — so pinning only Plan would let Design or Document reintroduce
-  # frontier spend by the back door.
-  #
-  # Develop is back on `balanced`, its §9 tier. Blanket-pinning every stage to `economy`
-  # was stricter than the constraint requires and was costing signal rather than money:
-  # in run 8 the economy model produced corrupt diffs on two mixed-service tasks that had
-  # passed on the same configuration in runs 6 and 7, failing them inside Develop before
-  # Test could run. That noise lands on exactly the runs meant to judge the planner.
-  # `balanced` costs about ten times `economy` per input token and still spends nothing
-  # on the frontier tier.
-  #
-  # Restore the full §9 mapping (plan/design frontier, develop/validate balanced,
-  # test/deploy/document economy) as one deliberate change once Plan is proven; that flip
-  # is what finally makes the benchmark's frontier-reduction gate measure a real ratio.
-  # src/config/defaults.ts still carries the spec mapping; this file diverges on purpose.
-  #
-  # NOTE: this does not make a benchmark run cheap on its own. The single-frontier
-  # baseline resolves models.frontier directly (src/benchmarks/baseline.ts), so it
-  # ignores this mapping entirely. Use `--system shadow` to leave it out during bring-up.
-  plan: economy
-  design: economy
+  # Spec §9 mapping. Which tier a stage asks for; the table above decides what that means.
+  plan: balanced
+  design: frontier
   develop: balanced
   test: economy
   validate: economy

@@ -1,4 +1,4 @@
-import { cp, mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import YAML from "yaml";
@@ -14,7 +14,12 @@ import { executeProcess } from "../tools/process.js";
 import { evaluateAcceptance, type AcceptanceEvaluation, type RunFacts } from "./acceptance.js";
 import { destructiveChangeRefusal } from "../tools/actions/patch.js";
 import { runBaselineTask, type BaselineRunResult } from "./baseline.js";
-import { BenchmarkFixtureSchema, type BenchmarkFixture, type BenchmarkTask } from "./fixture.js";
+import {
+  BenchmarkFixtureSchema,
+  type BenchmarkFixture,
+  type BenchmarkTask,
+  type GitRepositorySource
+} from "./fixture.js";
 import { buildShadowObservation } from "./observe.js";
 import type { BenchmarkObservation, BenchmarkReportInput } from "./report.js";
 
@@ -118,7 +123,17 @@ async function provisionWorkspace(
   }
   await rm(workspaceRoot, { recursive: true, force: true });
   await mkdir(workspaceRoot, { recursive: true });
-  await cp(resolve(fixtureDir, fixture.repository), workspaceRoot, { recursive: true });
+
+  if (typeof fixture.repository === "string") {
+    await cp(resolve(fixtureDir, fixture.repository), workspaceRoot, { recursive: true });
+  } else {
+    await cloneRepositorySource(fixture.repository, fixtureDir, workspaceRoot, signal);
+  }
+
+  // The tree is re-initialised as a fresh repository with a single commit either way, so
+  // changed files are computable from Git and a cloned repository's own history cannot be
+  // mistaken for the system's work.
+  await rm(resolve(workspaceRoot, ".git"), { recursive: true, force: true });
   await git(workspaceRoot, ["init", "--quiet"], signal);
   await git(workspaceRoot, ["add", "-A"], signal);
   await git(
@@ -126,11 +141,85 @@ async function provisionWorkspace(
     [
       "-c", "user.email=benchmark@shadow.local",
       "-c", "user.name=Shadow Benchmark",
-      "commit", "--quiet", "-m", `fixture ${fixture.id} revision ${fixture.repositoryRevision}`
+      "commit", "--quiet", "-m", `fixture ${fixture.id} at ${describeRepository(fixture)}`
     ],
     signal
   );
   return workspaceRoot;
+}
+
+/**
+ * Clones a fixture's source repository at a pinned revision. `--no-checkout` first so the
+ * revision is resolved before any working tree exists, and the clone is never written back
+ * to: the source repository is read-only input.
+ */
+async function cloneRepositorySource(
+  repository: GitRepositorySource,
+  fixtureDir: string,
+  workspaceRoot: string,
+  signal: AbortSignal
+): Promise<void> {
+  // A relative source resolves against the fixture directory, so a fixture that sits
+  // beside the repository it evaluates stays portable.
+  const source = /^[a-z][a-z0-9+.-]*:\/\//i.test(repository.source) || repository.source.startsWith("git@")
+    ? repository.source
+    : resolve(fixtureDir, repository.source);
+
+  await git(workspaceRoot, ["init", "--quiet"], signal);
+  await git(workspaceRoot, ["remote", "add", "origin", source], signal);
+  try {
+    await git(workspaceRoot, ["fetch", "--quiet", "--depth", "1", "origin", repository.revision], signal);
+  } catch {
+    // Shallow fetch of a bare SHA is refused by some servers and by older local repos.
+    await git(workspaceRoot, ["fetch", "--quiet", "origin"], signal);
+  }
+  await git(workspaceRoot, ["checkout", "--quiet", "--force", repository.revision], signal);
+
+  await applyExcludes(workspaceRoot, repository.exclude);
+}
+
+/**
+ * Removes excluded paths from a provisioned tree. An entry containing a separator is a
+ * path relative to the workspace root; a bare name matches anywhere in the tree, because
+ * the bulk worth dropping from a real repository — `node_modules`, `__pycache__`, `dist`
+ * — is usually nested rather than at the root.
+ */
+export async function applyExcludes(workspaceRoot: string, excludes: string[]): Promise<void> {
+  const names = new Set(excludes.filter((entry) => !entry.includes("/")));
+  for (const entry of excludes.filter((candidate) => candidate.includes("/"))) {
+    const target = resolve(workspaceRoot, entry);
+    if (!target.startsWith(`${workspaceRoot}${sep}`)) {
+      throw new Error(`Fixture exclude path escapes the workspace: ${entry}`);
+    }
+    await rm(target, { recursive: true, force: true });
+  }
+  if (names.size === 0) return;
+
+  const walk = async (directory: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === ".git") continue;
+      const full = resolve(directory, entry.name);
+      if (names.has(entry.name)) {
+        await rm(full, { recursive: true, force: true });
+        continue;
+      }
+      if (entry.isDirectory()) await walk(full);
+    }
+  };
+  await walk(workspaceRoot);
+}
+
+/** How a provisioned tree identifies itself, for the workspace's own commit message. */
+function describeRepository(fixture: BenchmarkFixture): string {
+  return typeof fixture.repository === "string"
+    ? `revision ${fixture.repositoryRevision}`
+    : `${fixture.repository.source}@${fixture.repository.revision}`;
 }
 
 /** Changed files observed in the workspace itself, not as self-reported by the system. */
@@ -353,9 +442,13 @@ export async function executeBenchmark(
   const taskReports: BenchmarkTaskReport[] = [];
   const skipped: BenchmarkSkippedTask[] = [];
   const requestedTasks = new Set(options.taskIds);
+  const fixtureRevisions: Record<string, string> = {};
 
   for (const fixtureDir of options.fixtureDirs) {
     const fixture = await loadBenchmarkFixture(fixtureDir);
+    fixtureRevisions[fixture.id] = typeof fixture.repository === "string"
+      ? String(fixture.repositoryRevision)
+      : `${fixture.repository.source}@${fixture.repository.revision}`;
     for (const task of fixture.tasks) {
       if (requestedTasks.size > 0 && !requestedTasks.has(task.id)) {
         continue;
@@ -397,6 +490,12 @@ export async function executeBenchmark(
     benchmarkId: options.benchmarkId,
     baselineModel: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,
     shadowConfig: agentMapping || "unmapped",
+    fixtureRevisions,
+    tierModels: {
+      frontier: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,
+      balanced: `${dependencies.config.models.balanced.provider}/${dependencies.config.models.balanced.model}`,
+      economy: `${dependencies.config.models.economy.provider}/${dependencies.config.models.economy.model}`
+    },
     observations: taskReports.map((report) => report.observation)
   };
 

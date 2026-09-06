@@ -29,46 +29,30 @@ const criteriaConsumingStages = new Set<StageName>(["design", "develop", "docume
 const RecommendedTierSchema = z.enum(["frontier", "balanced", "economy", "unspecified"]);
 
 export const PlanOutputSchema = z.object({
-  summary: z.string().default(""),
-  complexity: z.enum(["low", "medium", "high"]).default("medium"),
+  // Only fields that route a decision. On the frontier tier output costs five times
+  // input, so narration is the most expensive thing a plan can contain: `summary` was
+  // read by nobody, `goal` restated the request, and `complexity` echoed back a value
+  // scoreComplexity already computes deterministically.
   stages: z.array(StageNameSchema).default([]),
   tasks: z
     .array(
       z.object({
         stage: StageNameSchema,
-        goal: z.string().default(""),
         acceptanceCriteria: z.array(z.string()).default([]),
         recommendedTier: RecommendedTierSchema.default("unspecified")
       })
     )
     .default([]),
-  unknowns: z.array(z.string()).default([]),
-  risks: z.array(z.string()).default([]),
-  approvalsRequired: z.array(z.string()).default([])
+  risks: z.array(z.string()).default([])
 });
 export type PlanOutput = z.infer<typeof PlanOutputSchema>;
 
 const systemPrompt = [
-  "You are Shadow's Plan agent. You decide which lifecycle stages a request needs and what done means for each.",
-  "Return JSON matching the supplied schema.",
-  "",
-  "Stages available: plan, design, develop, test, validate, deploy, document.",
-  "Choose the smallest sufficient set. Most ordinary edit or fix requests need only develop, test, validate.",
-  "Include design only for genuinely architectural or cross-cutting work, or a new project.",
-  "Include deploy only when the request asks to deploy, release, or publish.",
-  "Include document only when the request asks for documentation or the change is not self-evident.",
-  "Never include plan; it has already run.",
-  "",
-  "Acceptance criteria are the definition of done for the user's requested change, and only that change.",
-  "Each criterion must be checkable by reading the resulting diff or running the repository's tests.",
-  "Write criteria only for design, develop, and document. Deterministic stages take none.",
-  `Write at most ${maxCriteriaPerStage} per stage, and fewer when fewer will do.`,
-  "Never write criteria about Shadow's own architecture, orchestration, persistence, budgeting, policy, or audit behaviour.",
-  "Those describe the harness, not the user's task, and a stage handed them will refuse ordinary work.",
-  "A one-line edit deserves one criterion, not four.",
-  "",
-  "Recommend a capability tier per stage only when the work clearly warrants something other than the default.",
-  "Record genuine unknowns and risks. Do not invent them, and do not narrate tool use."
+  "Plan Shadow's lifecycle for one code request. Return JSON matching the schema.",
+  "Pick the fewest stages that suffice. Most edits need develop, test, validate. Add design only for architectural or cross-cutting work, deploy only when asked to deploy, document only when asked. Never include plan.",
+  "Acceptance criteria define done for the user's change only, each checkable from the diff or the repository's tests. At most 4, and fewer when fewer will do: a one-line edit needs one. Write them only for design, develop, and document.",
+  "Never write criteria about Shadow itself - its orchestration, persistence, budgets, or policy. A stage handed those refuses ordinary work.",
+  "Recommend a tier only when the default clearly will not do. Report real risks only."
 ].join("\n");
 
 /** Measurable repository signals, per §8's deterministic complexity scoring. */
@@ -136,18 +120,13 @@ export function toPlanRevision(output: PlanOutput, request: string): PlanRevisio
         : [];
       return {
         stage,
-        goal: task?.goal.trim() || request,
+        goal: request,
         acceptanceCriteria: criteria,
         ...(tier === "unspecified" ? {} : { recommendedTier: tier as CapabilityTier })
       };
     }),
-    unknowns: output.unknowns,
-    approvalsRequired: output.approvalsRequired
+    risks: output.risks
   };
-}
-
-function planSummary(output: PlanOutput): string {
-  return output.summary.trim() || "Plan produced a structured result with no summary.";
 }
 
 export class PlanAgent implements Agent {
@@ -218,7 +197,7 @@ export class PlanAgent implements Agent {
         // executing an empty lifecycle.
         return {
           status: "completed",
-          summary: `${planSummary(completion.output)} Planned stages were unusable; the deterministic graph stands.`,
+          summary: "Plan returned no usable stage list; the deterministic graph stands.",
           decisions: [`Repository complexity scored ${signals.score}.`],
           artifacts: producedArtifacts,
           changedFiles: [],
@@ -236,7 +215,7 @@ export class PlanAgent implements Agent {
 
       return {
         status: "completed",
-        summary: planSummary(completion.output),
+        summary: `Planned ${revision.stages.join(", ")}.`,
         decisions: [
           `Repository complexity scored ${signals.score}.`,
           `Planned stages: ${revision.stages.join(", ")}.`,
@@ -254,8 +233,7 @@ export class PlanAgent implements Agent {
         testResults: [],
         openRisks: [
           ...inventoryRisks,
-          ...completion.output.risks,
-          ...completion.output.unknowns.map((unknown) => `Plan unknown: ${unknown}`)
+          ...completion.output.risks
         ],
         planRevision: revision,
         usage: completion.record.usage

@@ -45,13 +45,9 @@ async function fixtureWorkspace(): Promise<string> {
 
 function planOutput(overrides: Partial<PlanOutput> = {}): PlanOutput {
   return {
-    summary: "Planned.",
-    complexity: "low",
     stages: ["develop", "test", "validate"],
     tasks: [],
-    unknowns: [],
     risks: [],
-    approvalsRequired: [],
     ...overrides
   };
 }
@@ -96,13 +92,11 @@ describe("toPlanRevision", () => {
         tasks: [
           {
             stage: "develop",
-            goal: "Change the greeting.",
             acceptanceCriteria: ["hello.txt reads new"],
             recommendedTier: "unspecified"
           },
           {
             stage: "test",
-            goal: "Run tests.",
             // Deterministic stages take no criteria however insistent the plan is.
             acceptanceCriteria: ["the suite passes"],
             recommendedTier: "unspecified"
@@ -123,7 +117,6 @@ describe("toPlanRevision", () => {
         tasks: [
           {
             stage: "develop",
-            goal: "",
             acceptanceCriteria: ["  ", "a", "b", "c", "d", "e", "f"],
             recommendedTier: "unspecified"
           }
@@ -194,7 +187,6 @@ describe("model-backed Plan stage", () => {
         tasks: [
           {
             stage: "develop",
-            goal: "Change the greeting to new.",
             acceptanceCriteria: ["hello.txt contains new"],
             recommendedTier: "unspecified"
           }
@@ -215,7 +207,9 @@ describe("model-backed Plan stage", () => {
     ]);
     const develop = run.stageTasks.find((task) => task.stage === "develop");
     expect(develop?.acceptanceCriteria).toEqual(["hello.txt contains new"]);
-    expect(develop?.goal).toBe("Change the greeting to new.");
+    // The goal is the user's request verbatim. Having the model restate it per stage
+    // cost output tokens at the frontier rate to say what we already had.
+    expect(develop?.goal).toBe("change hello.txt from old to new");
     // Tools and write permissions stay with the stage table, not the plan.
     expect(develop?.allowedTools).toContain("patch.apply");
     expect(develop?.writePermissions).toBe(true);
@@ -262,8 +256,8 @@ describe("model-backed Plan stage", () => {
       planOutput({
         stages: ["develop", "validate"],
         tasks: [
-          { stage: "develop", goal: "Edit.", acceptanceCriteria: [], recommendedTier: "frontier" },
-          { stage: "validate", goal: "Check.", acceptanceCriteria: [], recommendedTier: "economy" }
+          { stage: "develop", acceptanceCriteria: [], recommendedTier: "frontier" },
+          { stage: "validate", acceptanceCriteria: [], recommendedTier: "economy" }
         ]
       })
     );

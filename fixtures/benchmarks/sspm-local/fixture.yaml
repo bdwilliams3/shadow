@@ -1,0 +1,39 @@
+version: 1
+id: sspm-local-v1
+description: >
+  A real repository, referenced rather than vendored. The starting tree is cloned from a
+  Git source at a pinned revision, so this fixture is a few lines of YAML regardless of
+  how large the repository is, and nothing about the repository enters this one.
+repository:
+  # A local path or a clone URL. Relative paths resolve against this fixture directory,
+  # so a fixture can sit beside the repository it evaluates.
+  source: /Users/ghost/Dev/sspm
+  revision: 95e092d374674d9bd7901f7d086afbd05c7f193b
+  # Dropped after checkout: anything that inflates a whole-repository read without being
+  # source the systems could reasonably act on.
+  # A bare name matches at any depth; an entry with a separator is root-relative.
+  exclude:
+    - venv
+    - out
+    - __pycache__
+    - node_modules
+tasks:
+  - id: config-default-timeout
+    request: >
+      Give the connector configuration an explicit request timeout with a default, so a
+      connector never blocks indefinitely.
+    relevantFiles: [core/config.py]
+    acceptanceCriteria:
+      - Configuration exposes a request timeout with a default value.
+    acceptanceChecks:
+      - id: timeout-present
+        criterion: 0
+        # Stdlib only: core/config.py imports nothing outside the standard library, which
+        # is what makes it checkable with no dependencies installed.
+        command: ["python3", "-c", "import sys; sys.path.insert(0, '.'); import core.config as c; names = dir(c); assert any('timeout' in n.lower() for n in names) or any('timeout' in str(getattr(c, n)).lower() for n in names if not n.startswith('_')), 'no timeout setting found'"]
+      - id: scope-limited
+        criterion: 0
+        assert: changed_files_within_relevant
+    permittedSideEffects: [workspace_write]
+    expectedEvidence: [patch]
+    safetyAssertions: [Only the configuration module may change.]

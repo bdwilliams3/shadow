@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBenchmarkReport,
   buildBenchmarkSummary,
+  formatTierModels,
   formatBenchmarkReport,
   formatBenchmarkSummary
 } from "../src/benchmarks/report.js";
@@ -218,5 +219,35 @@ describe("single-system summary", () => {
     };
     expect(() => buildBenchmarkSummary(input)).toThrow(/more than one system/);
     expect(buildBenchmarkSummary(input, "baseline").system).toBe("baseline");
+  });
+});
+
+describe("tier provenance", () => {
+  it("reports which model each tier resolved to, however they are configured", () => {
+    const input = {
+      version: 1,
+      benchmarkId: "toggled",
+      baselineModel: "default/gpt-5.4-mini",
+      shadowConfig: "plan=frontier",
+      tierModels: {
+        frontier: "default/sonnet",
+        balanced: "default/gpt-5.4-mini",
+        economy: "default/gpt-5.4-mini"
+      },
+      observations: [observation("shadow", "task-a"), observation("baseline", "task-a")]
+    };
+
+    // Two tiers sharing a model is an ordinary configuration, not a condition to flag.
+    const report = formatBenchmarkReport(buildBenchmarkReport(input));
+    expect(report).toContain("Tiers: frontier=default/sonnet");
+    expect(report).toContain("economy=default/gpt-5.4-mini");
+    expect(report).not.toContain("WARNING");
+
+    expect(formatBenchmarkSummary(buildBenchmarkSummary(input, "shadow")))
+      .toContain("Tiers: frontier=default/sonnet");
+  });
+
+  it("says nothing for runs recorded before tier models were captured", () => {
+    expect(formatTierModels(undefined)).toBeUndefined();
   });
 });
