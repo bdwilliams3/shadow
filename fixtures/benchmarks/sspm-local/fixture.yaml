@@ -28,9 +28,12 @@ tasks:
     acceptanceChecks:
       - id: timeout-present
         criterion: 0
-        # Stdlib only: core/config.py imports nothing outside the standard library, which
-        # is what makes it checkable with no dependencies installed.
-        command: ["python3", "-c", "import sys; sys.path.insert(0, '.'); import core.config as c; names = dir(c); assert any('timeout' in n.lower() for n in names) or any('timeout' in str(getattr(c, n)).lower() for n in names if not n.startswith('_')), 'no timeout setting found'"]
+        # Verified to fail on the untouched tree and pass once a numeric timeout exists.
+        # An acceptance check that has not been shown to fail before the change tests
+        # nothing: the first version of this one matched `PROJECT_ROOT`, whose value is the
+        # workspace path, which contains the task id "config-default-timeout". It passed on
+        # a tree Shadow had not touched. Never stringify module values in a check.
+        command: ["python3", "-c", "import dataclasses, sys; sys.path.insert(0, '.'); import core.config as c; names = [n for n in dir(c) if 'timeout' in n.lower()]; names += [f.name for o in vars(c).values() if dataclasses.is_dataclass(o) for f in dataclasses.fields(o) if 'timeout' in f.name.lower()]; assert names, 'no timeout setting found'; vals = [getattr(c, n, None) for n in names] + [f.default for o in vars(c).values() if dataclasses.is_dataclass(o) for f in dataclasses.fields(o) if 'timeout' in f.name.lower()]; assert any(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals), 'timeout has no numeric default'"]
       - id: scope-limited
         criterion: 0
         assert: changed_files_within_relevant

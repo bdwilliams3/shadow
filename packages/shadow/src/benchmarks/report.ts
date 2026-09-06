@@ -266,6 +266,20 @@ export function formatBenchmarkSummary(summary: BenchmarkSummary): string {
   ].join("\n");
 }
 
+/**
+ * How much of the baseline's result Shadow kept.
+ *
+ * A zero baseline used to report zero retention, which inverted the meaning: on the sspm
+ * fixture the baseline passed no criteria and Shadow passed all of them, and the gate
+ * failed Shadow for it. A baseline that achieved nothing cannot have been regressed
+ * against, so beating it scores 1. Both scoring zero is not a pass either — nothing was
+ * demonstrated — so that stays 0 and the gate still fails.
+ */
+function retention(shadow: number, baseline: number): number {
+  if (baseline > 0) return shadow / baseline;
+  return shadow > 0 ? 1 : 0;
+}
+
 export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
   const input = BenchmarkReportInputSchema.parse(rawInput);
   const baseline = input.observations.filter((observation) => observation.system === "baseline");
@@ -283,14 +297,16 @@ export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
   const frontierTokenReduction = baselineAggregate.frontierTokens === 0
     ? 0
     : 1 - shadowAggregate.frontierTokens / baselineAggregate.frontierTokens;
-  const qualityRetention = baselineAggregate.acceptancePassRate === 0
-    ? 0
-    : shadowAggregate.acceptancePassRate / baselineAggregate.acceptancePassRate;
+  const qualityRetention = retention(
+    shadowAggregate.acceptancePassRate,
+    baselineAggregate.acceptancePassRate
+  );
   // Criteria can all pass while the run itself fails, so completion is gated separately
   // (ADR 0016); otherwise correct code that breaks its own pipeline reads as a pass.
-  const taskSuccessRetention = baselineAggregate.taskSuccessRate === 0
-    ? 0
-    : shadowAggregate.taskSuccessRate / baselineAggregate.taskSuccessRate;
+  const taskSuccessRetention = retention(
+    shadowAggregate.taskSuccessRate,
+    baselineAggregate.taskSuccessRate
+  );
   const medianInterventionDelta =
     shadowAggregate.medianHumanInterventions - baselineAggregate.medianHumanInterventions;
   const thresholds = {

@@ -251,3 +251,31 @@ describe("tier provenance", () => {
     expect(formatTierModels(undefined)).toBeUndefined();
   });
 });
+
+describe("retention when the baseline scores nothing", () => {
+  function pair(shadowPassed: number, baselinePassed: number) {
+    return {
+      version: 1,
+      benchmarkId: "zero-baseline",
+      baselineModel: "default/m",
+      shadowConfig: "plan=balanced",
+      observations: [
+        { ...observation("shadow", "task-a"), acceptanceCriteriaPassed: shadowPassed, acceptanceCriteriaTotal: 1, succeeded: shadowPassed > 0 },
+        { ...observation("baseline", "task-a"), acceptanceCriteriaPassed: baselinePassed, acceptanceCriteriaTotal: 1, succeeded: baselinePassed > 0 }
+      ]
+    };
+  }
+
+  it("does not punish Shadow for a baseline that passed nothing", () => {
+    const report = buildBenchmarkReport(pair(1, 0));
+    // Previously this reported 0 retention and failed the gate for outperforming.
+    expect(report.qualityRetention).toBe(1);
+    expect(report.thresholds.qualityRetention).toBe(true);
+  });
+
+  it("still fails when neither system achieved anything", () => {
+    const report = buildBenchmarkReport(pair(0, 0));
+    expect(report.qualityRetention).toBe(0);
+    expect(report.thresholds.qualityRetention).toBe(false);
+  });
+});

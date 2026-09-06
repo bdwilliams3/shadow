@@ -39,8 +39,8 @@ models:
     outputCostPerMillionTokens: 1.20
 agents:
   # Spec §9 mapping. Which tier a stage asks for; the table above decides what that means.
-  plan: balanced
-  design: frontier
+  plan: frontier
+  design: balanced
   develop: balanced
   test: economy
   validate: economy

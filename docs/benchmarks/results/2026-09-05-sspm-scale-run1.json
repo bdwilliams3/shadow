@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "default/gpt-5.6-sol",
+  "shadowConfig": "plan=balanced,design=frontier,develop=balanced,test=economy,validate=economy,deploy=economy,document=economy",
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "tierModels": {
+    "frontier": "default/gpt-5.6-sol",
+    "balanced": "default/gpt-5.5",
+    "economy": "default/gpt-5.4-mini"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 27908,
+      "totalTokens": 27908,
+      "estimatedCostUsd": 0.171952,
+      "latencyMs": 43149,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 0,
+      "totalTokens": 31949,
+      "estimatedCostUsd": 0.138078,
+      "latencyMs": 56344,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 10,
+      "stageCount": 2,
+      "retries": 1,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}
