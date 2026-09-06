@@ -1,0 +1,279 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "default/gpt-5.6-sol",
+  "shadowConfig": "plan=frontier,design=balanced,develop=balanced,test=economy,validate=economy,deploy=economy,document=economy",
+  "workRoot": "/tmp/shadow-bench.9epum4",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/baseline",
+      "status": "completed",
+      "changedFiles": [
+        "agents/README.md",
+        "core/auth.py",
+        "core/config.py",
+        "core/connectors/base.py",
+        "core/connectors/cloudflare.py",
+        "tests/test_config.py"
+      ],
+      "failedChecks": [
+        {
+          "id": "scope-limited",
+          "detail": "changed files outside the relevant set: agents/README.md, core/auth.py, core/connectors/base.py, core/connectors/cloudflare.py, tests/test_config.py"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "def6fd36-bcf5-4f2f-a492-1a8941e6bd71",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/bf/bf316ea0bf5d39d9b1307511e59deb634ff03667074402e7e8e4101f0ef6aae6-baseline.patch",
+          "sha256": "bf316ea0bf5d39d9b1307511e59deb634ff03667074402e7e8e4101f0ef6aae6",
+          "bytes": 9889
+        },
+        {
+          "id": "45a4dd0e-098a-4269-8224-be81c3b7f0f4",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/97/97c6a580f3cb0033e774f8c0930a01269d3da9b81b0cf22ce77a50ff909bb069-patch.check.stdout.log",
+          "sha256": "97c6a580f3cb0033e774f8c0930a01269d3da9b81b0cf22ce77a50ff909bb069",
+          "bytes": 147
+        },
+        {
+          "id": "ea9459e3-3145-4a0c-badf-79bf1d12371a",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/4a/4a2237eda4ce41a391af435b165ff81be5d943ceb5bccbf38551e43b3582c8fc-patch.check.result.json",
+          "sha256": "4a2237eda4ce41a391af435b165ff81be5d943ceb5bccbf38551e43b3582c8fc",
+          "bytes": 299
+        },
+        {
+          "id": "f82b738a-77cb-437c-a437-748150463f70",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/de/de7f76f1262ceab111e319fd9a980205c87795ad37870222289b9622dca967a6-patch.apply.result.json",
+          "sha256": "de7f76f1262ceab111e319fd9a980205c87795ad37870222289b9622dca967a6",
+          "bytes": 298
+        }
+      ]
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow",
+      "status": "COMPLETED",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "deeca1f6-bb1b-44c2-9ead-411b2ac6b848",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "78bab8c8-a6d5-4dbe-94b0-4370a71df3f1",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "d3c4bee4-3433-4b88-b4ba-fe8a0c889881",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "2f4c5e72-a9d2-4f69-a471-530b14125563",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "0378f694-99bb-45b5-a1ea-186793756557",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a2/a24f40b128295e432e12c4965c1428134dcf93dd7bd0ead808d11339c0851666-plan.result.json",
+          "sha256": "a24f40b128295e432e12c4965c1428134dcf93dd7bd0ead808d11339c0851666",
+          "bytes": 1162
+        },
+        {
+          "id": "3b834e53-8ad0-46aa-83f1-c05c71522005",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/67/67494b9a831f1a7aacdbe5165236bf7b715120e11c252ad8c4fdacfa9833a19c-context.select.stdout.log",
+          "sha256": "67494b9a831f1a7aacdbe5165236bf7b715120e11c252ad8c4fdacfa9833a19c",
+          "bytes": 1184
+        },
+        {
+          "id": "1b7414de-a219-40e6-9574-c9707aad289c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/eb/ebf046012c4eb1eac03a0b1d3ff766d507aa06858964d53ccbb1efb8068e6713-context.select.result.json",
+          "sha256": "ebf046012c4eb1eac03a0b1d3ff766d507aa06858964d53ccbb1efb8068e6713",
+          "bytes": 6819
+        },
+        {
+          "id": "594a109c-ff6c-48fa-8fd0-650380f48b8c",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/66/66bea85f9b1bd175565c94e9142108549d71fbfb8d10c5e4ff910ca1d0999a15-git.status.stdout.log",
+          "sha256": "66bea85f9b1bd175565c94e9142108549d71fbfb8d10c5e4ff910ca1d0999a15",
+          "bytes": 849
+        },
+        {
+          "id": "6a8d3031-05a3-47ba-9e4a-0707d5d68715",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/0f/0f0d87e8133087099367b1deaec5d5409e62d5dc4eb09b6dfcc7bc22008f89e0-develop.patch",
+          "sha256": "0f0d87e8133087099367b1deaec5d5409e62d5dc4eb09b6dfcc7bc22008f89e0",
+          "bytes": 3005
+        },
+        {
+          "id": "e3c6d1d8-a011-4273-8282-cdd5fc7a386f",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/12/12585d7551377691a9c2ebaf997a806293a002b16f5013813ebc2f3c56d1b2e9-patch.check.stdout.log",
+          "sha256": "12585d7551377691a9c2ebaf997a806293a002b16f5013813ebc2f3c56d1b2e9",
+          "bytes": 20
+        },
+        {
+          "id": "bdb9522e-8e53-444f-b17b-da8fe6d4dd96",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "2051a095-ff05-48ca-b4b7-1c8280b3e99c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "87bb7c48-5419-4891-855f-b74b2b36be5e",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        },
+        {
+          "id": "d2b7de1d-2b4f-4b7d-8292-ab4b3f8950e6",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/12/12e9858cd74fa3d792129bf92b53393f595fe710401b4b4a577a841fc01d07a1-git.status.stdout.log",
+          "sha256": "12e9858cd74fa3d792129bf92b53393f595fe710401b4b4a577a841fc01d07a1",
+          "bytes": 1535
+        },
+        {
+          "id": "bdc9a2c1-62a3-4468-a6c7-6b489090e127",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/43/43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464-git.status.result.json",
+          "sha256": "43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464",
+          "bytes": 174
+        },
+        {
+          "id": "6a00a149-d0e9-4992-9486-b4290de2c3a0",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/6f/6f5994595590066adad0f2f9e7a8dfad1d5703643b34d8a31b234ad62b9b28e5-tests.select.stdout.log",
+          "sha256": "6f5994595590066adad0f2f9e7a8dfad1d5703643b34d8a31b234ad62b9b28e5",
+          "bytes": 2276
+        },
+        {
+          "id": "28c43cca-9d13-4a14-b7b6-bcde3b5e76ab",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/24/24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7-tests.select.result.json",
+          "sha256": "24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7",
+          "bytes": 170
+        },
+        {
+          "id": "14542636-6cad-45e0-a669-f388f95dc5cf",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/1b/1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87-quality.test.result.json",
+          "sha256": "1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87",
+          "bytes": 52
+        },
+        {
+          "id": "f86ee820-5985-4cd9-b007-09111ff120f5",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ae/aeb95ffe399dce63b42d61d0f595422c22f33795c5c704ce00325b16e2043bdd-git.status.stdout.log",
+          "sha256": "aeb95ffe399dce63b42d61d0f595422c22f33795c5c704ce00325b16e2043bdd",
+          "bytes": 2348
+        },
+        {
+          "id": "61be676c-a216-4681-882d-100d72bc362b",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/58/581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee-quality.typecheck.result.json",
+          "sha256": "581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee",
+          "bytes": 57
+        },
+        {
+          "id": "079dfd0a-c892-4571-b4c8-e235769d50b5",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d4/d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492-security.secrets.result.json",
+          "sha256": "d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492",
+          "bytes": 138
+        },
+        {
+          "id": "3f3f7fcd-5845-4c9f-9051-bfe278ba17a1",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.9epum4/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3e/3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878-security.dependencies.result.json",
+          "sha256": "3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878",
+          "bytes": 127
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "tierModels": {
+    "frontier": "default/gpt-5.6-sol",
+    "balanced": "default/gpt-5.5",
+    "economy": "default/gpt-5.4-mini"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 27971,
+      "totalTokens": 27971,
+      "estimatedCostUsd": 0.173212,
+      "latencyMs": 39414,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 956,
+      "totalTokens": 5243,
+      "estimatedCostUsd": 0.038432,
+      "latencyMs": 22899,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}
