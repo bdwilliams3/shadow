@@ -27,6 +27,8 @@ const noUsage = {
 
 /** One bounded Develop work unit may introduce a handful of files, not scaffold a tree. */
 const maxCreatedFiles = 10;
+const developContextMaxFiles = 4;
+const developContextMaxBytes = 24_000;
 
 export const DevelopOutputSchema = z.object({
   // Not required. A weak model that declines correctly but leaves the summary empty had
@@ -48,6 +50,7 @@ const developSystemPrompt = [
   "Implement only the requested change using the supplied files and acceptance criteria.",
   "Return JSON matching the supplied schema.",
   "The patch must be a standard unified Git diff with workspace-relative paths.",
+  "Prefer the smallest patch against the highest-ranked relevant file; modify additional files only when the acceptance criteria cannot be met without them.",
   "Do not delete files, create symlinks, include binary patches, modify files absent from context, or add unrelated changes.",
   "You may add new files with a create-mode diff when the change genuinely requires them; keep additions minimal and related.",
   "When prior failures are supplied, this is a remediation pass: fix the reported failures without reverting work that already passed.",
@@ -66,9 +69,26 @@ export class DevelopAgent implements Agent {
   ) {}
 
   async run(task: StageTask, context: StageContext): Promise<StageResult> {
+    const allowedChangedFiles = task.allowedChangedFiles ?? [];
     const selection = await this.actions.run<SelectedContext>(
       "context.select",
-      { request: context.request, databasePath: this.databasePath, exclusions: this.exclusions },
+      {
+        request: [
+          context.request,
+          ...task.acceptanceCriteria,
+          ...task.constraints,
+          ...(allowedChangedFiles.length > 0
+            ? [`Only these workspace-relative files may be changed: ${allowedChangedFiles.join(", ")}`]
+            : [])
+        ].join("\n"),
+        candidatePaths: allowedChangedFiles,
+        maxFiles: allowedChangedFiles.length > 0
+          ? Math.min(developContextMaxFiles, allowedChangedFiles.length)
+          : developContextMaxFiles,
+        maxBytes: developContextMaxBytes,
+        databasePath: this.databasePath,
+        exclusions: this.exclusions
+      },
       { dryRun: context.dryRun }
     );
     const status = await this.actions.run<GitStatusSummary>("git.status", {}, {
@@ -165,6 +185,28 @@ export class DevelopAgent implements Agent {
           modelCalls: [completion.record],
           testResults: [],
           openRisks: [...completion.output.openRisks, check.output?.diagnostics ?? "Invalid patch."],
+          usage: completion.record.usage
+        };
+      }
+
+      const allowedChanged = new Set(allowedChangedFiles);
+      const disallowedChanges = allowedChanged.size > 0
+        ? check.output.changedFiles.filter((file) => !allowedChanged.has(file))
+        : [];
+      if (disallowedChanges.length > 0) {
+        return {
+          status: "failed",
+          summary: `Patch attempted to modify files outside the allowed change scope: ${disallowedChanges.join(", ")}`,
+          decisions: completion.output.decisions,
+          artifacts: producedArtifacts,
+          changedFiles: check.output.changedFiles,
+          toolCalls: actionRecords,
+          modelCalls: [completion.record],
+          testResults: [],
+          openRisks: [
+            ...completion.output.openRisks,
+            "The patch exceeded the task's allowed changed files."
+          ],
           usage: completion.record.usage
         };
       }

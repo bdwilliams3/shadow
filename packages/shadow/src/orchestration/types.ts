@@ -111,6 +111,7 @@ export const StageTaskSchema = z.object({
   allowedTools: z.array(z.string()).default([]),
   writePermissions: z.boolean().default(false),
   acceptanceCriteria: z.array(z.string()).default([]),
+  allowedChangedFiles: z.array(z.string().min(1)).optional(),
   budget: BudgetSchema,
   retryCount: z.number().int().nonnegative().default(0),
   deadlineEpochMs: z.number().int().positive().optional()

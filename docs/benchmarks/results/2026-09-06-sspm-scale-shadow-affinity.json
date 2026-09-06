@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "default/gpt-5.6-sol",
+  "shadowConfig": "plan=frontier,design=balanced,develop=balanced,test=economy,validate=economy,deploy=economy,document=economy",
+  "workRoot": "/tmp/shadow-sspm-scale.sWyzPY",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow",
+      "status": "FAILED",
+      "changedFiles": [],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "98143189-0fe2-4c4e-bae6-40ec0cb7cbe3",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "bd35cb05-6b49-4a0c-9152-f74c890282ac",
+          "kind": "action.result",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "55d1fd6f-b4fd-42c8-b1b1-3ffd254fbab0",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "65e6c3b5-5e7a-4ede-8cf7-0556c2be199e",
+          "kind": "action.result",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "f09d2599-9c2e-4cf1-a333-134a595b24ec",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/14/143fa80ccc01e35b9f9c0b62347469fe0f0c651e83b4c87aeb2649ffb43038af-plan.result.json",
+          "sha256": "143fa80ccc01e35b9f9c0b62347469fe0f0c651e83b4c87aeb2649ffb43038af",
+          "bytes": 1116
+        },
+        {
+          "id": "6cf32b20-a202-4e29-8e12-981280b4ab97",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/6e/6e9e4f3ca0824378bbf152e5a20e548d2b3719494f1eff2141f0f436f77a6cf4-context.select.stdout.log",
+          "sha256": "6e9e4f3ca0824378bbf152e5a20e548d2b3719494f1eff2141f0f436f77a6cf4",
+          "bytes": 1184
+        },
+        {
+          "id": "95342580-1112-4c39-9848-748dd636b570",
+          "kind": "action.result",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c5/c56620b63421ec9f3b7e2a05d7db094201336226b582dd9cbd39cb35f17e36ca-context.select.result.json",
+          "sha256": "c56620b63421ec9f3b7e2a05d7db094201336226b582dd9cbd39cb35f17e36ca",
+          "bytes": 50406
+        },
+        {
+          "id": "91445202-90db-4a1f-90ca-0d80089ec982",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-sspm-scale.sWyzPY/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c6/c6081b46d5e856e550be89649b817a59c3e991a8d5c09b44e59a5973138a8e7f-git.status.stdout.log",
+          "sha256": "c6081b46d5e856e550be89649b817a59c3e991a8d5c09b44e59a5973138a8e7f",
+          "bytes": 849
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "tierModels": {
+    "frontier": "default/gpt-5.6-sol",
+    "balanced": "default/gpt-5.5",
+    "economy": "default/gpt-5.4-mini"
+  },
+  "observations": [
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 777,
+      "totalTokens": 777,
+      "estimatedCostUsd": 0.006244,
+      "latencyMs": 34606,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 9,
+      "stageCount": 2,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

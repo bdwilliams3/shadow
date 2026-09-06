@@ -21,7 +21,8 @@ import {
   type GitRepositorySource
 } from "./fixture.js";
 import { buildShadowObservation } from "./observe.js";
-import type { BenchmarkObservation, BenchmarkReportInput } from "./report.js";
+import type { BenchmarkObservation, BenchmarkReportInput, BenchmarkWorkspace } from "./report.js";
+import type { ArtifactReference } from "../orchestration/types.js";
 
 const riskyRiskClasses = new Set(["external_write", "destructive"]);
 
@@ -60,6 +61,7 @@ export interface BenchmarkTaskReport {
   status: string;
   acceptance: AcceptanceEvaluation;
   changedFiles: string[];
+  artifacts: ArtifactReference[];
   observation: BenchmarkObservation;
 }
 
@@ -284,6 +286,33 @@ function dangerousActionCounts(
   };
 }
 
+function uniqueArtifacts(artifacts: readonly ArtifactReference[]): ArtifactReference[] {
+  const seen = new Set<string>();
+  const unique: ArtifactReference[] = [];
+  for (const artifact of artifacts) {
+    const key = `${artifact.sha256}\0${artifact.kind}\0${artifact.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(artifact);
+  }
+  return unique;
+}
+
+function benchmarkWorkspace(report: BenchmarkTaskReport): BenchmarkWorkspace {
+  return {
+    fixtureId: report.fixtureId,
+    taskId: report.taskId,
+    system: report.system,
+    workspaceRoot: report.workspaceRoot,
+    status: report.status,
+    changedFiles: report.changedFiles,
+    failedChecks: report.acceptance.checks
+      .filter((check) => !check.passed)
+      .map((check) => ({ id: check.id, detail: check.detail })),
+    artifacts: report.artifacts
+  };
+}
+
 async function executeShadowTask(
   fixture: BenchmarkFixture,
   task: BenchmarkTask,
@@ -302,7 +331,12 @@ async function executeShadowTask(
       providers: dependencies.providers,
       ...dependencies.orchestrator
     });
-    run = await orchestrator.run({ request: task.request, workspaceRoot, dryRun: false });
+    run = await orchestrator.run({
+      request: task.request,
+      workspaceRoot,
+      dryRun: false,
+      allowedChangedFiles: task.relevantFiles
+    });
   } finally {
     store.close();
   }
@@ -340,6 +374,11 @@ async function executeShadowTask(
     },
     artifacts
   );
+  const runArtifacts = uniqueArtifacts(
+    run.stageRuns.flatMap((stage) =>
+      stage.attemptResults.flatMap((attempt) => attempt.artifacts)
+    )
+  );
 
   return {
     fixtureId: fixture.id,
@@ -347,6 +386,7 @@ async function executeShadowTask(
     status: run.state,
     acceptance,
     changedFiles,
+    artifacts: runArtifacts,
     observation
   };
 }
@@ -408,6 +448,7 @@ async function executeBaselineTask(
     status: result.status,
     acceptance,
     changedFiles,
+    artifacts: uniqueArtifacts(result.artifacts),
     observation
   };
 }
@@ -490,6 +531,8 @@ export async function executeBenchmark(
     benchmarkId: options.benchmarkId,
     baselineModel: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,
     shadowConfig: agentMapping || "unmapped",
+    workRoot,
+    workspaces: taskReports.map(benchmarkWorkspace),
     fixtureRevisions,
     tierModels: {
       frontier: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,

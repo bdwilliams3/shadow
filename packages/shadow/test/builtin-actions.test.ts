@@ -121,6 +121,65 @@ describe("built-in actions", () => {
     expect(result.output?.files.map((file) => file.path)).toEqual(["z-checkout.ts"]);
   });
 
+  it("selects config files for configuration requests instead of only connector bodies", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "shadow-context-config-"));
+    await mkdir(join(workspace, "core/connectors"), { recursive: true });
+    await writeFile(
+      join(workspace, "core/config.py"),
+      "from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass ProviderCreds:\n    extra: dict[str, str]\n",
+      "utf8"
+    );
+    await writeFile(
+      join(workspace, "core/connectors/cloudflare.py"),
+      "from ..config import ProviderCreds\n\nclass CloudflareConnector:\n    pass\n",
+      "utf8"
+    );
+    await writeFile(
+      join(workspace, "skills-cloudflare.md"),
+      "Cloudflare connector request timeout documentation.\n",
+      "utf8"
+    );
+    const runner = new ActionRunner(
+      createDefaultActionRegistry(),
+      workspace,
+      defaultConfig,
+      new ArtifactStore(join(workspace, ".shadow/artifacts"))
+    );
+
+    const result = await runner.run<SelectedContext>("context.select", {
+      request: "Give connector configuration an explicit request timeout with a default.",
+      maxFiles: 2
+    });
+
+    expect(result.output?.files.map((file) => file.path)).toContain("core/config.py");
+  });
+
+  it("skips a lower-ranked file that only fits as a fragment", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "shadow-context-fragment-"));
+    await writeFile(join(workspace, "target-one.txt"), "target\n".repeat(100), "utf8");
+    await writeFile(join(workspace, "target-two.txt"), "target\n".repeat(2_000), "utf8");
+    await writeFile(join(workspace, "target-three.txt"), "target\n", "utf8");
+    const runner = new ActionRunner(
+      createDefaultActionRegistry(),
+      workspace,
+      defaultConfig,
+      new ArtifactStore(join(workspace, ".shadow/artifacts"))
+    );
+
+    const result = await runner.run<SelectedContext>("context.select", {
+      request: "target",
+      candidatePaths: ["target-one.txt", "target-three.txt"],
+      maxFiles: 3,
+      maxBytes: 1_000
+    });
+
+    expect(result.output?.files.map((file) => file.path)).toEqual([
+      "target-one.txt",
+      "target-three.txt"
+    ]);
+    expect(result.output?.files.every((file) => !file.truncated)).toBe(true);
+  });
+
   it("detects selected files that change before patch application", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "shadow-context-verify-"));
     const path = join(workspace, "target.ts");

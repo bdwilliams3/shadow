@@ -51,6 +51,7 @@ const systemPrompt = [
   "Plan Shadow's lifecycle for one code request. Return JSON matching the schema.",
   "Pick the fewest stages that suffice. Most edits need develop, test, validate. Add design only for architectural or cross-cutting work, deploy only when asked to deploy, document only when asked. Never include plan.",
   "Acceptance criteria define done for the user's change only, each checkable from the diff or the repository's tests. At most 4, and fewer when fewer will do: a one-line edit needs one. Write them only for design, develop, and document.",
+  "For configuration/default-setting requests, keep criteria on the configuration surface and backward-compatible default unless the user explicitly asks to wire named consumers.",
   "Never write criteria about Shadow itself - its orchestration, persistence, budgets, or policy. A stage handed those refuses ordinary work.",
   "Recommend a tier only when the default clearly will not do. Report real risks only."
 ].join("\n");

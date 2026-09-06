@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { CapabilityTierSchema, type CapabilityTier } from "../orchestration/types.js";
+import {
+  ArtifactReferenceSchema,
+  CapabilityTierSchema,
+  type CapabilityTier
+} from "../orchestration/types.js";
 
 export const BenchmarkObservationSchema = z.object({
   system: z.enum(["baseline", "shadow"]),
@@ -53,11 +57,38 @@ export const BenchmarkObservationSchema = z.object({
 });
 export type BenchmarkObservation = z.infer<typeof BenchmarkObservationSchema>;
 
+export const BenchmarkWorkspaceSchema = z.object({
+  fixtureId: z.string().min(1),
+  taskId: z.string().min(1),
+  system: z.enum(["baseline", "shadow"]),
+  workspaceRoot: z.string().min(1),
+  status: z.string().min(1),
+  changedFiles: z.array(z.string()).default([]),
+  failedChecks: z.array(z.object({
+    id: z.string().min(1),
+    detail: z.string()
+  })).default([]),
+  artifacts: z.array(ArtifactReferenceSchema).default([])
+});
+export type BenchmarkWorkspace = z.infer<typeof BenchmarkWorkspaceSchema>;
+
 export const BenchmarkReportInputSchema = z.object({
   version: z.literal(1),
   benchmarkId: z.string().min(1),
   baselineModel: z.string().min(1),
   shadowConfig: z.string().min(1),
+  /**
+   * Where fixture workspaces were provisioned. Benchmark workspaces are intentionally kept
+   * for inspection; saving this path in the JSON makes failed-run artifacts findable after
+   * the terminal output is gone.
+   */
+  workRoot: z.string().min(1).optional(),
+  /**
+   * Per-task audit breadcrumbs. Reports still aggregate from observations, but a failed
+   * result needs enough metadata to locate `develop.patch`, `patch.check` output, and the
+   * exact workspace without spelunking through transient logs.
+   */
+  workspaces: z.array(BenchmarkWorkspaceSchema).default([]),
   /**
    * What each capability tier resolved to when the run was taken. Optional so runs
    * recorded before this field still parse. Tiers deliberately collapsed onto one model
@@ -71,7 +102,7 @@ export const BenchmarkReportInputSchema = z.object({
    * reproducible, and that only works if the number says which revision it came from.
    */
   fixtureRevisions: z.record(z.string(), z.string().min(1)).optional(),
-  observations: z.array(BenchmarkObservationSchema).min(2)
+  observations: z.array(BenchmarkObservationSchema).min(1)
 });
 export type BenchmarkReportInput = z.infer<typeof BenchmarkReportInputSchema>;
 

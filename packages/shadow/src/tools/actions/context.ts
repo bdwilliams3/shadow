@@ -56,6 +56,21 @@ function isSafeRelativePath(path: string): boolean {
   return !isAbsolute(path) && !path.split(/[\\/]/).includes("..");
 }
 
+function affinityScore(path: string, symbols: readonly string[], imports: readonly string[], terms: readonly string[]): number {
+  const tokenizedPath = path.toLowerCase().match(/[a-z0-9_]+/g) ?? [];
+  const tokenizedBasename = path.split(/[\\/]/).pop()?.toLowerCase().match(/[a-z0-9_]+/g) ?? [];
+  const tokenizedSymbols = symbols.flatMap((symbol) => symbol.toLowerCase().match(/[a-z0-9_]+/g) ?? []);
+  const tokenizedImports = imports.flatMap((entry) => entry.toLowerCase().match(/[a-z0-9_]+/g) ?? []);
+  let score = 0;
+  for (const term of terms) {
+    if (tokenizedBasename.some((token) => token === term || token.startsWith(term))) score += 400;
+    if (tokenizedPath.some((token) => token === term || token.startsWith(term))) score += 200;
+    if (tokenizedSymbols.some((token) => token === term || token.startsWith(term))) score += 120;
+    if (tokenizedImports.some((token) => token === term || token.startsWith(term))) score += 80;
+  }
+  return score;
+}
+
 function redactSecrets(value: string): { content: string; redactions: number } {
   let redactions = 0;
   const replace = (pattern: RegExp, replacement: string): void => {
@@ -108,14 +123,21 @@ export const contextSelectAction: ActionDefinition<
     const index = new RepositoryIndex(databasePath, context.workspaceRoot);
     const rankedByPath = new Map<string, { path: string; score: number }>();
     try {
+      const allFiles = index.listFiles();
       for (const path of input.candidatePaths.filter(isSafeRelativePath)) {
-        if (index.getFile(path)) rankedByPath.set(path, { path, score: 1_000 });
+        if (index.getFile(path)) rankedByPath.set(path, { path, score: 1_000_000 });
+      }
+      for (const file of allFiles) {
+        const score = affinityScore(file.path, file.symbols, file.imports, terms);
+        if (score > 0) rankedByPath.set(file.path, { path: file.path, score });
       }
       for (const file of index.search(input.request, Math.max(100, input.maxFiles * 5))) {
-        if (!rankedByPath.has(file.path)) rankedByPath.set(file.path, { path: file.path, score: file.score });
+        const existing = rankedByPath.get(file.path);
+        const score = (existing?.score ?? 0) + file.score;
+        rankedByPath.set(file.path, { path: file.path, score });
       }
       if (rankedByPath.size < input.maxFiles) {
-        for (const file of index.listFiles()) {
+        for (const file of allFiles) {
           if (!rankedByPath.has(file.path)) rankedByPath.set(file.path, { path: file.path, score: 0 });
         }
       }
@@ -147,6 +169,9 @@ export const contextSelectAction: ActionDefinition<
         continue;
       }
       const remaining = input.maxBytes - totalBytes;
+      if (content.byteLength > remaining) {
+        continue;
+      }
       const selected = content.subarray(0, remaining);
       const redacted = redactSecrets(selected.toString("utf8"));
       redactionCount += redacted.redactions;

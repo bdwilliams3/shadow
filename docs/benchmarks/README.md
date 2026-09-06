@@ -44,7 +44,7 @@ shadow benchmark run fixtures/benchmarks/mixed-service --benchmark-id suite-v1 -
 
 The baseline is a single frontier-tier model that receives the whole discoverable repository in one call and applies its diff through the same patch actions Shadow uses. It does not use Shadow's context selection and gets its own generous model-call budget, so the comparison measures orchestration rather than budget enforcement. See ADR 0014.
 
-Provisioned workspaces are kept under `--work-root` (a temporary directory when unset) so a failed task can be inspected afterwards.
+Provisioned workspaces are kept under `--work-root` (a temporary directory when unset) so a failed task can be inspected afterwards. JSON written with `--out` includes the `workRoot` plus a `workspaces` audit list with each task workspace, failed checks, and artifact references such as `develop.patch` and `patch.check` logs.
 
 ## Deterministic acceptance checks
 

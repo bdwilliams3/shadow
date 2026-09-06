@@ -62,6 +62,7 @@ export interface StageTaskInput {
   budget: Budget;
   dryRun: boolean;
   acceptanceCriteria?: string[];
+  allowedChangedFiles?: string[];
   id?: string;
 }
 
@@ -76,6 +77,9 @@ export function createStageTask(input: StageTaskInput): StageTask {
     allowedTools: allowedToolsFor(input.stage),
     writePermissions: writePermissionsFor(input.stage, input.dryRun),
     acceptanceCriteria: input.acceptanceCriteria ?? [],
+    ...(input.allowedChangedFiles !== undefined
+      ? { allowedChangedFiles: [...input.allowedChangedFiles] }
+      : {}),
     budget: input.budget,
     retryCount: 0
   };
@@ -90,7 +94,8 @@ export function planWorkflow(
   runId: string,
   request: string,
   config: ShadowConfig,
-  dryRun: boolean
+  dryRun: boolean,
+  allowedChangedFiles?: string[]
 ): PlannedWorkflow {
   const normalized = request.toLowerCase();
   const deployRequested = /\b(deploy|release|publish)\b/.test(normalized);
@@ -128,7 +133,8 @@ export function planWorkflow(
         stage,
         goal: request,
         budget: config.budgets.stage,
-        dryRun
+        dryRun,
+        ...(allowedChangedFiles !== undefined ? { allowedChangedFiles } : {})
       })
     ),
     invariants,

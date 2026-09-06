@@ -184,6 +184,21 @@ describe("benchmark reports", () => {
 });
 
 describe("single-system summary", () => {
+  it("reports a single observation without tripping the comparison schema", () => {
+    const input = {
+      version: 1,
+      benchmarkId: "bring-up",
+      baselineModel: "provider/model",
+      shadowConfig: "plan=economy",
+      observations: [observation("shadow", "task-a")]
+    };
+
+    const summary = buildBenchmarkSummary(input);
+
+    expect(summary.system).toBe("shadow");
+    expect(summary.totals.taskCount).toBe(1);
+  });
+
   it("reports totals for a shadow-only run instead of demanding a baseline", () => {
     const input = {
       version: 1,

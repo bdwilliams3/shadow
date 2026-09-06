@@ -101,6 +101,50 @@ describe("Tests MCP", () => {
     expect(await readFile(summary.artifacts[0]!.path, "utf8")).toBe("raw test output");
   });
 
+  it("treats a configured pytest project without pytest installed as not configured", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "shadow-tests-mcp-pytest-missing-"));
+    const bin = join(workspace, "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(join(workspace, "pyproject.toml"), "[tool.pytest.ini_options]\n", "utf8");
+    await writeFile(
+      join(bin, "python3"),
+      "#!/usr/bin/env sh\nprintf '%s\\n' 'python3: No module named pytest' >&2\nexit 1\n",
+      { encoding: "utf8", mode: 0o755 }
+    );
+    await chmod(join(bin, "python3"), 0o755);
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${bin}${originalPath ? `:${originalPath}` : ""}`;
+    try {
+      const service = new TestsService(
+        workspace,
+        new ArtifactStore(join(workspace, ".shadow/artifacts"))
+      );
+
+      const discovery = await service.discoverTests({ workspace_id: workspace, framework: "pytest" });
+      const accepted = service.runTests({
+        workspace_id: workspace,
+        framework: "pytest",
+        selectors: ["tests/test_config.py"],
+        timeout_seconds: 5,
+        max_retries: 1
+      });
+      const summary = await waitForSummary(service, accepted.run_id);
+
+      expect(discovery.status).toBe("not_configured");
+      expect(summary.status).toBe("not_configured");
+      expect(summary.attempts).toBe(1);
+      expect(summary.message).toContain("pytest is not installed");
+      expect(summary.failures).toEqual([]);
+      expect(summary.artifacts).toHaveLength(1);
+    } finally {
+      if (originalPath === undefined) {
+        delete process.env.PATH;
+      } else {
+        process.env.PATH = originalPath;
+      }
+    }
+  });
+
   it("publishes all seven tools over MCP with structured responses", async () => {
     const workspace = await vitestWorkspace();
     const service = new TestsService(

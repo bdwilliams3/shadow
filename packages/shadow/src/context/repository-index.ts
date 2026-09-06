@@ -421,9 +421,14 @@ export function languageForPath(path: string): string {
 }
 
 export function lexicalTerms(value: string): string[] {
-  return [...new Set(value.toLowerCase().match(/[a-z0-9_]{2,}/g) ?? [])]
+  const terms = [...new Set(value.toLowerCase().match(/[a-z0-9_]{2,}/g) ?? [])]
     .filter((term) => !stopWords.has(term))
     .slice(0, 20);
+  const expanded: string[] = [];
+  for (const term of terms) {
+    expanded.push(term, ...(termAliases[term] ?? []));
+  }
+  return [...new Set(expanded)];
 }
 
 export function resolveRepositoryIndexPath(workspaceRoot: string, configuredPath: string): string {
@@ -438,6 +443,18 @@ export function resolveRepositoryIndexPath(workspaceRoot: string, configuredPath
 const stopWords = new Set([
   "add", "and", "change", "create", "fix", "for", "from", "implement", "into", "that", "the", "this", "with"
 ]);
+
+const termAliases: Record<string, string[]> = {
+  configuration: ["config"],
+  configurations: ["config"],
+  configurable: ["config"],
+  configured: ["config"],
+  configuring: ["config"],
+  setting: ["config"],
+  settings: ["config"],
+  connector: ["connectors"],
+  connectors: ["connector"]
+};
 
 function isRelevantRepositoryPath(path: string, exclusions: string[] = []): boolean {
   if (path.length === 0 || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {

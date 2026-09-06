@@ -380,6 +380,25 @@ describe("benchmark executor", () => {
     expect(baseline?.changedFiles).toEqual([]);
     expect(baseline?.observation.succeeded).toBe(false);
     expect(baseline?.observation.acceptanceCriteriaPassed).toBe(0);
+    expect(execution.input.workRoot).toBe(execution.workRoot);
+    expect(execution.input.workspaces).toHaveLength(1);
+    expect(execution.input.workspaces[0]).toMatchObject({
+      fixtureId: "synthetic-v1",
+      taskId: "swap-hello",
+      system: "baseline",
+      workspaceRoot: baseline?.workspaceRoot,
+      status: "failed",
+      changedFiles: []
+    });
+    expect(execution.input.workspaces[0]?.failedChecks).toEqual([
+      expect.objectContaining({ id: "hello-updated" })
+    ]);
+    expect(execution.input.workspaces[0]?.artifacts.some((artifact) =>
+      artifact.kind === "baseline.patch" && artifact.path.endsWith("baseline.patch")
+    )).toBe(true);
+    expect(execution.input.workspaces[0]?.artifacts.some((artifact) =>
+      artifact.kind === "action.stderr" && artifact.path.includes("patch.check.stderr.log")
+    )).toBe(true);
   });
 });
 

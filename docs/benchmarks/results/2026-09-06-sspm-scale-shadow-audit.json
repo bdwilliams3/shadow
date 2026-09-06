@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "default/gpt-5.6-sol",
+  "shadowConfig": "plan=frontier,design=balanced,develop=balanced,test=economy,validate=economy,deploy=economy,document=economy",
+  "workRoot": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow",
+      "status": "FAILED",
+      "changedFiles": [
+        "core/auth.py",
+        "core/connectors/cloudflare.py",
+        "skills/cloudflare-posture/SKILL.md"
+      ],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        },
+        {
+          "id": "scope-limited",
+          "detail": "changed files outside the relevant set: core/auth.py, core/connectors/cloudflare.py, skills/cloudflare-posture/SKILL.md"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "2e0a5985-bb93-492c-8f92-8ef4db2f8130",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "ad39d4af-12fd-4231-a2d1-65be70e68e2c",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "9073ac1c-7e3e-411e-8d05-5a65748ec096",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "a2e954fd-27d3-4e24-9d29-8a0d8bf77241",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "1acd74b3-41be-478b-b829-e5d4055ab928",
+          "kind": "plan.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/39/39e9bb55b5568984d11f0fb50d677e59e2d93d154d17f23d02d22b245ab282a3-plan.result.json",
+          "sha256": "39e9bb55b5568984d11f0fb50d677e59e2d93d154d17f23d02d22b245ab282a3",
+          "bytes": 1276
+        },
+        {
+          "id": "827a639b-bfde-41fe-888d-75e7b7b0d83a",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/9a/9a83426e4d4583e597785d51e60cd06d4e92c942d88143b26409f54f9197f61c-context.select.stdout.log",
+          "sha256": "9a83426e4d4583e597785d51e60cd06d4e92c942d88143b26409f54f9197f61c",
+          "bytes": 1184
+        },
+        {
+          "id": "0ebd29ab-95dc-47ec-8679-f1ccf5b094e9",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/f8/f87c4a41274165552cc59e7d2c693bdd493e2c155b2a7a94a703665c20c57350-context.select.result.json",
+          "sha256": "f87c4a41274165552cc59e7d2c693bdd493e2c155b2a7a94a703665c20c57350",
+          "bytes": 44678
+        },
+        {
+          "id": "12f9160c-3d56-4810-aeea-5d6143c860a7",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c8/c84a840f54146649f6965effa116c4c4e2453aace7500121178cf9600513d307-git.status.stdout.log",
+          "sha256": "c84a840f54146649f6965effa116c4c4e2453aace7500121178cf9600513d307",
+          "bytes": 849
+        },
+        {
+          "id": "caf15e0b-e356-4149-af0e-f521321a911a",
+          "kind": "develop.patch",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/08/08170bd2e10ec30c1a57a2ecd1e66fc67bb400f7d40ff4817e610a709c0b6a54-develop.patch",
+          "sha256": "08170bd2e10ec30c1a57a2ecd1e66fc67bb400f7d40ff4817e610a709c0b6a54",
+          "bytes": 5898
+        },
+        {
+          "id": "944ebe2a-f8a7-4e5d-85b4-08a33601c8ab",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/47/47803abb5038b0321fc98fcc9ef4a02bdadd1c0a4a80571dfac7601826332b5d-patch.check.stdout.log",
+          "sha256": "47803abb5038b0321fc98fcc9ef4a02bdadd1c0a4a80571dfac7601826332b5d",
+          "bytes": 91
+        },
+        {
+          "id": "8d254d99-4c79-41d8-8f6b-4ae3102b5196",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/14/14f2ebe8af74648406c8c475b48a2bfe380ff85833223f17f565c7567175c4a9-patch.check.result.json",
+          "sha256": "14f2ebe8af74648406c8c475b48a2bfe380ff85833223f17f565c7567175c4a9",
+          "bytes": 206
+        },
+        {
+          "id": "deb09580-ea01-4df7-b7ba-f540d417674f",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "9f5daa84-9b31-4a48-bae9-5dc6ea30e578",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/68/681fae66365ea45f95c5c9ec361f547c89245f48a36bee6ae54f3242aa2eb34f-patch.apply.result.json",
+          "sha256": "681fae66365ea45f95c5c9ec361f547c89245f48a36bee6ae54f3242aa2eb34f",
+          "bytes": 205
+        },
+        {
+          "id": "cfb26477-bfca-4ef7-a96e-9291b87207c8",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/66/66862ba5f942a5d9d447e0c81b436e7eee24e16aa6b7f1613299638c393c5718-context.select.stdout.log",
+          "sha256": "66862ba5f942a5d9d447e0c81b436e7eee24e16aa6b7f1613299638c393c5718",
+          "bytes": 3073
+        },
+        {
+          "id": "2fd39e2b-3906-4bfb-af5c-1e7ff3aebe30",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/50/508e79c4e6a9481bf42b058e1bfa64288a5e17ebea6ae5109103f1566a7ef11a-context.select.result.json",
+          "sha256": "508e79c4e6a9481bf42b058e1bfa64288a5e17ebea6ae5109103f1566a7ef11a",
+          "bytes": 45934
+        },
+        {
+          "id": "56508f6e-dfbc-42da-9d37-e0302103ae84",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4a/4acd0ac9ddeed6602d40c789224a4ee538f33dc683d8761f74ded47d92a8adec-git.status.stdout.log",
+          "sha256": "4acd0ac9ddeed6602d40c789224a4ee538f33dc683d8761f74ded47d92a8adec",
+          "bytes": 2876
+        },
+        {
+          "id": "4e0656a5-a852-4e01-8835-76ea1c94514d",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c7/c74e2279d800ae83ecc5531ea2ba76d572deadd08767ab41a28ab648f7a6d080-git.status.result.json",
+          "sha256": "c74e2279d800ae83ecc5531ea2ba76d572deadd08767ab41a28ab648f7a6d080",
+          "bytes": 416
+        },
+        {
+          "id": "9d6dd937-5570-4d70-a7f7-bdeb43bca73a",
+          "kind": "develop.patch",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a38f9f3e7d57113bf64215207fe365035c62edb81ad2e4218091c5ba61bc8ad8-develop.patch",
+          "sha256": "a38f9f3e7d57113bf64215207fe365035c62edb81ad2e4218091c5ba61bc8ad8",
+          "bytes": 1632
+        },
+        {
+          "id": "540b7aa0-9c5b-4fae-83ef-c75c5edbf5da",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/29/2995d7fb625f424b318569c17b6e92a0411863d6c68dbc7b56975a293e153951-patch.check.stdout.log",
+          "sha256": "2995d7fb625f424b318569c17b6e92a0411863d6c68dbc7b56975a293e153951",
+          "bytes": 35
+        },
+        {
+          "id": "a5f64afe-861f-45b4-ab48-a84c22c9718b",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ef/ef509c4ea8df57116fce030f32938feaf263eb57f67957a93fe155d4e8247956-patch.check.result.json",
+          "sha256": "ef509c4ea8df57116fce030f32938feaf263eb57f67957a93fe155d4e8247956",
+          "bytes": 144
+        },
+        {
+          "id": "a80f7c59-5712-489f-9ba6-81bf98b9f208",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/fd/fd62b29b8a29fe6dab8d472ed6480419639d81b0c7bee2f982c4aab4839b3ff5-patch.apply.result.json",
+          "sha256": "fd62b29b8a29fe6dab8d472ed6480419639d81b0c7bee2f982c4aab4839b3ff5",
+          "bytes": 143
+        },
+        {
+          "id": "f85a54a2-8fc9-4e7b-9d8b-e74dc906659a",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c8/c8270ac5ffef0711f82766f66ef4c20ac4acf7fbe7d12b90fba057c0632493d7-git.status.stdout.log",
+          "sha256": "c8270ac5ffef0711f82766f66ef4c20ac4acf7fbe7d12b90fba057c0632493d7",
+          "bytes": 1604
+        },
+        {
+          "id": "86ca4a75-64d1-4bcf-b3d1-76e237c8fe3c",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/5a/5a3778cc8c1f7d950203584e2baed672baf0afed465eed07213856e18ad2820a-tests.select.stdout.log",
+          "sha256": "5a3778cc8c1f7d950203584e2baed672baf0afed465eed07213856e18ad2820a",
+          "bytes": 2276
+        },
+        {
+          "id": "cb6177ac-9072-434c-bd2d-6228adb0dc03",
+          "kind": "action.result",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/8b/8b2d8429bd9f69783eba5d8dd8bba422a2da7fe098ffbc5e794473ce387489d7-tests.select.result.json",
+          "sha256": "8b2d8429bd9f69783eba5d8dd8bba422a2da7fe098ffbc5e794473ce387489d7",
+          "bytes": 247
+        },
+        {
+          "id": "83f15328-dfad-47b4-9b04-43e2df74e11c",
+          "kind": "tests.log",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c6/c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c-f03cceb4-80ff-45dd-83b2-15dcb0a1da58.log",
+          "sha256": "c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c",
+          "bytes": 66
+        },
+        {
+          "id": "b0d29dd4-6e49-4a33-af39-1691cea3e483",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4b/4bf1af06d84893cc64a7a4948dae591ee5f71afd20a7d7b4441d7296ce020047-git.status.stdout.log",
+          "sha256": "4bf1af06d84893cc64a7a4948dae591ee5f71afd20a7d7b4441d7296ce020047",
+          "bytes": 2184
+        },
+        {
+          "id": "e64c9dae-0ef2-4473-aa77-2d4d152d92e7",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/bc/bc6579cf3c968b6fe213b6aa96216528aba083f3d5f3a82d3a9fac401a8d4afd-tests.select.stdout.log",
+          "sha256": "bc6579cf3c968b6fe213b6aa96216528aba083f3d5f3a82d3a9fac401a8d4afd",
+          "bytes": 2732
+        },
+        {
+          "id": "11d0bb5a-8770-4d58-a0b6-0cdaaff4a252",
+          "kind": "tests.log",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c6/c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c-7caed5c8-479e-4b0d-923a-7b24779f6cb0.log",
+          "sha256": "c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c",
+          "bytes": 66
+        },
+        {
+          "id": "9591d336-c9a0-4d02-a5b3-8fee14342a0d",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/40/40a5bb128ad2438ff2a58454fedd74db4e3d2e3445939f80988a7835bd2286bc-git.status.stdout.log",
+          "sha256": "40a5bb128ad2438ff2a58454fedd74db4e3d2e3445939f80988a7835bd2286bc",
+          "bytes": 3428
+        },
+        {
+          "id": "c0cf6704-fbd6-425c-9856-79bf5cfa68b6",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/df/df9126921cd9d6430de86fa4d0d79be227eb6cca1ad2eeb29e1516065cd7f651-tests.select.stdout.log",
+          "sha256": "df9126921cd9d6430de86fa4d0d79be227eb6cca1ad2eeb29e1516065cd7f651",
+          "bytes": 3943
+        },
+        {
+          "id": "0304a01f-97b8-4c99-9ddd-fffdb79ed910",
+          "kind": "tests.log",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c6/c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c-e2cb94db-17c1-4272-b88c-3ddd344453ab.log",
+          "sha256": "c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c",
+          "bytes": 66
+        },
+        {
+          "id": "31f48705-5e5f-482c-b9b0-cd401eb9e386",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/2f/2f573bbda5c09e0fc1f0b36e61ccd6e8ffd1c58632bf7fb04af458c270595ee5-git.status.stdout.log",
+          "sha256": "2f573bbda5c09e0fc1f0b36e61ccd6e8ffd1c58632bf7fb04af458c270595ee5",
+          "bytes": 3782
+        },
+        {
+          "id": "99e4c56f-668b-49a7-a2c0-20cd806a10ff",
+          "kind": "action.stdout",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/e8/e8067cc8c2c0713f7be7b3b888ecad1f97c69c311783878aa4680415d36e95d7-tests.select.stdout.log",
+          "sha256": "e8067cc8c2c0713f7be7b3b888ecad1f97c69c311783878aa4680415d36e95d7",
+          "bytes": 4288
+        },
+        {
+          "id": "c2321aca-b7f1-4262-bb2e-58c84a5f9611",
+          "kind": "tests.log",
+          "path": "/var/folders/dd/t7j8yszs71v077dp_dn71s6r0000gn/T/shadow-benchmark-Ihn2Kg/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c6/c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c-07b72ea4-246b-41fd-ac94-a47f34817afe.log",
+          "sha256": "c6da66510d64d30bb94386d7ed170611ea6aa71a7fef632c4851480b7f247c3c",
+          "bytes": 66
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "tierModels": {
+    "frontier": "default/gpt-5.6-sol",
+    "balanced": "default/gpt-5.5",
+    "economy": "default/gpt-5.4-mini"
+  },
+  "observations": [
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 838,
+      "totalTokens": 30094,
+      "estimatedCostUsd": 0.114616,
+      "latencyMs": 48690,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 10,
+      "stageCount": 3,
+      "retries": 4,
+      "testRecoveriesAttempted": 1,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

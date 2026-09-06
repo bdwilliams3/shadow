@@ -38,6 +38,7 @@ export interface RunRequest {
   request: string;
   workspaceRoot: string;
   dryRun: boolean;
+  allowedChangedFiles?: string[];
 }
 
 export interface OrchestratorDependencies {
@@ -82,7 +83,13 @@ export class LifecycleOrchestrator {
     await this.store.createRun(run);
     run = await this.transition(run, "CLASSIFIED", { requestLength: input.request.length });
 
-    const planned = planWorkflow(run.id, input.request, this.config, input.dryRun);
+    const planned = planWorkflow(
+      run.id,
+      input.request,
+      this.config,
+      input.dryRun,
+      input.allowedChangedFiles
+    );
     run.openRisks = planned.risks;
     run.stageTasks = planned.stages;
     run.stageRuns = planned.stages.map<StageRun>((task) => ({
@@ -478,6 +485,9 @@ export class LifecycleOrchestrator {
         budget: this.config.budgets.stage,
         dryRun: run.dryRun,
         acceptanceCriteria: planned?.acceptanceCriteria ?? [],
+        ...(existing?.allowedChangedFiles !== undefined
+          ? { allowedChangedFiles: existing.allowedChangedFiles }
+          : {}),
         ...(existing ? { id: existing.id } : {})
       });
       // Artifacts already routed to a surviving task (a remediation failure, say) outlive

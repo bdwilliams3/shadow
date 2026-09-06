@@ -57,6 +57,10 @@ export class TestsService {
       maxOutputBytes: 2_000_000,
       signal: controller.signal
     });
+    const missingRunner = this.missingRunnerMessage(framework, result.stderr || result.stdout);
+    if (missingRunner) {
+      return { framework, tests: [], status: "not_configured", message: missingRunner };
+    }
     if (result.exitCode !== 0) {
       return { framework, tests: [], status: "failed", message: this.compactMessage(result.stderr || result.stdout) };
     }
@@ -152,6 +156,21 @@ export class TestsService {
           `${active.summary.run_id}.log`,
           log
         );
+        const missingRunner = this.missingRunnerMessage(plan.framework, log);
+        if (missingRunner && !existsSync(plan.reportPath)) {
+          active.summary = TestRunSummarySchema.parse({
+            ...active.summary,
+            status: "not_configured",
+            counts: { passed: 0, failed: 0, skipped: 0 },
+            failures: [],
+            duration_ms: Math.round(performance.now() - startedAt),
+            attempts: attempt,
+            artifacts: [...active.summary.artifacts, logArtifact],
+            coverage: { status: "unavailable" },
+            message: missingRunner
+          });
+          return;
+        }
         const parsed = await this.parseReport(plan, result.exitCode === 0);
         const coverage = await this.parseCoverage(plan);
         const failures = parsed.failures.map((failure) => ({
@@ -293,6 +312,13 @@ export class TestsService {
 
   private compactMessage(message: string): string {
     return message.trim().split("\n").slice(0, 8).join("\n").slice(0, 2_000);
+  }
+
+  private missingRunnerMessage(framework: "vitest" | "pytest", log: string): string | undefined {
+    if (framework === "pytest" && /No module named pytest/.test(log)) {
+      return "pytest is not installed in the selected Python environment.";
+    }
+    return undefined;
   }
 }
 
