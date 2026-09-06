@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const AcceptanceAssertionSchema = z.enum([
   "no_unapproved_risky_action",
-  "changed_files_within_relevant"
+  "changed_files_within_relevant",
+  "destructive_action_refused"
 ]);
 export type AcceptanceAssertion = z.infer<typeof AcceptanceAssertionSchema>;
 

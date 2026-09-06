@@ -162,6 +162,66 @@ function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeo
   };
 }
 
+export const BenchmarkSummarySchema = z.object({
+  version: z.literal(1),
+  benchmarkId: z.string().min(1),
+  system: z.enum(["baseline", "shadow"]),
+  totals: AggregateSchema
+});
+export type BenchmarkSummary = z.infer<typeof BenchmarkSummarySchema>;
+
+/**
+ * Absolute totals for a single system. Every threshold in `buildBenchmarkReport` except
+ * dangerous-action rejection is a ratio against the baseline, so a one-system run cannot
+ * pass or fail — it can only report what happened. This exists for bring-up runs, where
+ * the baseline is the expensive half and is deliberately not run.
+ */
+export function buildBenchmarkSummary(rawInput: unknown, system?: "baseline" | "shadow"): BenchmarkSummary {
+  const input = BenchmarkReportInputSchema.parse(rawInput);
+  const present = [...new Set(input.observations.map((observation) => observation.system))];
+  const chosen = system ?? (present.length === 1 ? present[0] : undefined);
+  if (!chosen) {
+    throw new Error(
+      present.length === 0
+        ? "Benchmark observations are empty."
+        : "Observations contain more than one system; name the one to summarise."
+    );
+  }
+  const observations = input.observations.filter((observation) => observation.system === chosen);
+  if (observations.length === 0) {
+    throw new Error(`No ${chosen} observations are present.`);
+  }
+  return BenchmarkSummarySchema.parse({
+    version: 1,
+    benchmarkId: input.benchmarkId,
+    system: chosen,
+    totals: aggregate(observations)
+  });
+}
+
+export function formatBenchmarkSummary(summary: BenchmarkSummary): string {
+  const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  const totals = summary.totals;
+  return [
+    `Benchmark ${summary.benchmarkId}: ${summary.system} only (no comparison)`,
+    `Tasks: ${totals.taskCount}`,
+    `Frontier tokens: ${totals.frontierTokens} (${percentage(totals.frontierTokenPercentage)} of total)`,
+    `Tasks completed: ${percentage(totals.taskSuccessRate)}`,
+    `Acceptance pass rate: ${percentage(totals.acceptancePassRate)}`,
+    `Median interventions: ${totals.medianHumanInterventions}`,
+    `Dangerous-action rejection: ${percentage(totals.dangerousActionRejectionRate)}`,
+    `Total tokens: ${totals.totalTokens}`,
+    `Estimated cost: $${totals.estimatedCostUsd.toFixed(4)}`,
+    `Latency: ${totals.latencyMs}ms`,
+    `Irrelevant files loaded: ${totals.irrelevantFilesLoaded}`,
+    `Stages: ${totals.stageCount}, retries: ${totals.retries}`,
+    `Unevaluated criteria: ${totals.unevaluatedCriteria}`,
+    "",
+    "Reduction, retention, and the PASS/FAIL gate are ratios against the baseline and",
+    "need a paired run: drop --system to run both."
+  ].join("\n");
+}
+
 export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
   const input = BenchmarkReportInputSchema.parse(rawInput);
   const baseline = input.observations.filter((observation) => observation.system === "baseline");

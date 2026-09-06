@@ -12,7 +12,7 @@ import type { ActionRunner } from "../tools/runner.js";
 import type { Agent, StageContext } from "./contract.js";
 
 export const DocumentOutputSchema = z.object({
-  summary: z.string().min(1),
+  summary: z.string().default(""),
   patch: z.string().max(500_000).default(""),
   changeSummary: z.array(z.string()).default([]),
   migrationNotes: z.array(z.string()).default([]),

@@ -8,10 +8,17 @@ import { Command } from "commander";
 import { ArtifactStore } from "../artifacts/store.js";
 import { executeBenchmark, formatBenchmarkExecution } from "../benchmarks/executor.js";
 import { buildShadowObservation } from "../benchmarks/observe.js";
-import { buildBenchmarkReport, formatBenchmarkReport } from "../benchmarks/report.js";
+import {
+  buildBenchmarkReport,
+  buildBenchmarkSummary,
+  formatBenchmarkReport,
+  formatBenchmarkSummary
+} from "../benchmarks/report.js";
 import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/load.js";
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
 import { createConfiguredProviders } from "../models/factory.js";
+import { stageCallsModel } from "../orchestration/planner.js";
+import type { StageName } from "../orchestration/types.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
 import type { Run } from "../orchestration/types.js";
 import { openSQLitePersistenceStore, type SQLitePersistenceStore } from "../persistence/sqlite-store.js";
@@ -156,7 +163,10 @@ async function showModels(): Promise<void> {
   console.log(`Config sources: ${sources.length > 0 ? sources.join(", ") : "defaults"}`);
   for (const [stage, tier] of Object.entries(config.agents)) {
     const model = config.models[tier];
-    console.log(`${stage}: ${tier} -> ${model.provider}/${model.model}`);
+    // A tier mapped to a deterministic stage is inert. Saying so avoids the impression
+    // that changing it will move any tokens.
+    const note = stageCallsModel(stage as StageName) ? "" : "  (deterministic; no model call)";
+    console.log(`${stage}: ${tier} -> ${model.provider}/${model.model}${note}`);
   }
 }
 
@@ -255,17 +265,35 @@ async function runBenchmark(
   console.log(options.json ? JSON.stringify(execution.input, null, 2) : formatBenchmarkExecution(execution));
 
   if (options.report) {
-    const report = buildBenchmarkReport(execution.input);
-    console.log(formatBenchmarkReport(report));
-    if (!report.passed) {
-      process.exitCode = 1;
+    // A single-system run has no ratios to gate on, so it reports totals instead of
+    // failing for want of a baseline it was never asked to run.
+    if (pairedSystems(execution.input)) {
+      const report = buildBenchmarkReport(execution.input);
+      console.log(formatBenchmarkReport(report));
+      if (!report.passed) {
+        process.exitCode = 1;
+      }
+    } else {
+      console.log(formatBenchmarkSummary(buildBenchmarkSummary(execution.input)));
     }
   }
 }
 
+/** True when observations cover both systems, which is what a comparison requires. */
+function pairedSystems(input: { observations: Array<{ system: string }> }): boolean {
+  const systems = new Set(input.observations.map((observation) => observation.system));
+  return systems.has("baseline") && systems.has("shadow");
+}
+
 async function reportBenchmark(inputPath: string, options: { json?: boolean }): Promise<void> {
   const path = resolve(process.cwd(), inputPath);
-  const report = buildBenchmarkReport(JSON.parse(await readFile(path, "utf8")));
+  const parsed = JSON.parse(await readFile(path, "utf8"));
+  if (!pairedSystems(parsed)) {
+    const summary = buildBenchmarkSummary(parsed);
+    console.log(options.json ? JSON.stringify(summary, null, 2) : formatBenchmarkSummary(summary));
+    return;
+  }
+  const report = buildBenchmarkReport(parsed);
   console.log(options.json ? JSON.stringify(report, null, 2) : formatBenchmarkReport(report));
   if (!report.passed) {
     process.exitCode = 1;

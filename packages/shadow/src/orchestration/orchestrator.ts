@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { DevelopAgent, PlanAgent, TestAgent, ValidateAgent } from "../agents/basic-agents.js";
+import { DevelopAgent, TestAgent, ValidateAgent } from "../agents/basic-agents.js";
+import { PlanAgent } from "../agents/plan-agent.js";
 import { DeployAgent } from "../agents/deploy-agent.js";
 import { DesignAgent } from "../agents/design-agent.js";
 import { DocumentAgent } from "../agents/document-agent.js";
@@ -18,10 +19,12 @@ import type { PersistenceStore } from "../persistence/store.js";
 import { createDefaultActionRegistry } from "../tools/default-registry.js";
 import { ActionRunner } from "../tools/runner.js";
 import { addUsage } from "./budget.js";
-import { planWorkflow } from "./planner.js";
+import { createStageTask, planWorkflow } from "./planner.js";
 import { assertTransition, stateForStage } from "./state-machine.js";
 import type {
   ApprovalRecord,
+  CapabilityTier,
+  PlanRevision,
   Run,
   RunState,
   StageName,
@@ -29,6 +32,7 @@ import type {
   StageRun,
   StageTask
 } from "./types.js";
+import { stageOrder } from "./types.js";
 
 export interface RunRequest {
   request: string;
@@ -134,6 +138,10 @@ export class LifecycleOrchestrator {
     return {
       plan: new PlanAgent(
         actions,
+        models,
+        artifactStore,
+        this.config.agents.plan,
+        this.config.lifecycle.enabledStages,
         this.config.persistence.databasePath,
         this.config.workspace.exclusions
       ),
@@ -317,6 +325,9 @@ export class LifecycleOrchestrator {
             return run;
           }
 
+          if (result.status === "completed" && result.planRevision) {
+            await this.applyPlanRevision(run, result.planRevision, index);
+          }
           if (result.status === "completed" || result.status === "skipped") {
             break;
           }
@@ -408,6 +419,143 @@ export class LifecycleOrchestrator {
     } finally {
       clearInterval(monitor);
     }
+  }
+
+  /**
+   * Applies a Plan stage's revision to the part of the lifecycle graph that has not run.
+   *
+   * The revision is a proposal, not an instruction. Everything that governs cost or blast
+   * radius stays with configuration and the stage table: enablement, canonical ordering,
+   * allowed tools, write permissions, and the ceiling on capability tier. What the plan
+   * genuinely decides is which stages run and what done means for each.
+   *
+   * Stages at or before `currentIndex` have already executed and are never touched, so a
+   * revision cannot rewrite history or re-run completed work. Surviving stages keep their
+   * task id, which keeps resume, approvals, and remediation cycle bookkeeping coherent.
+   */
+  private async applyPlanRevision(
+    run: Run,
+    revision: PlanRevision,
+    currentIndex: number
+  ): Promise<void> {
+    const prefix = run.stageTasks.slice(0, currentIndex + 1);
+    const executed = new Set(prefix.map((task) => task.stage));
+    const suffix = run.stageTasks.slice(currentIndex + 1);
+    const before = suffix.map((task) => task.stage);
+
+    const enabled = new Set(this.config.lifecycle.enabledStages);
+    const requested = [...new Set(revision.stages)]
+      .filter((stage) => enabled.has(stage) && !executed.has(stage))
+      .sort((left, right) => stageOrder.indexOf(left) - stageOrder.indexOf(right));
+
+    const rejectedStages = [...new Set(revision.stages)].filter(
+      (stage) => !enabled.has(stage) && !executed.has(stage)
+    );
+
+    if (requested.length === 0) {
+      // A revision that leaves nothing to do is not actionable; keep the bootstrap graph.
+      run.openRisks = [
+        ...new Set([
+          ...run.openRisks,
+          "Plan proposed no runnable stages; the deterministic stage graph was kept."
+        ])
+      ];
+      await this.store.updateRun(this.touch(run));
+      return;
+    }
+
+    const plannedByStage = new Map(revision.tasks.map((task) => [task.stage, task]));
+    const reusableByStage = new Map(suffix.map((task) => [task.stage, task]));
+    const risks: string[] = [];
+
+    const revisedTasks = requested.map((stage) => {
+      const planned = plannedByStage.get(stage);
+      const existing = reusableByStage.get(stage);
+      const task = createStageTask({
+        runId: run.id,
+        stage,
+        goal: planned?.goal ?? run.request,
+        budget: this.config.budgets.stage,
+        dryRun: run.dryRun,
+        acceptanceCriteria: planned?.acceptanceCriteria ?? [],
+        ...(existing ? { id: existing.id } : {})
+      });
+      // Artifacts already routed to a surviving task (a remediation failure, say) outlive
+      // the revision.
+      task.inputs = existing?.inputs ?? [];
+      return task;
+    });
+
+    const revisedRuns = revisedTasks.map<StageRun>((task) => {
+      const existing = run.stageRuns.find((candidate) => candidate.id === task.id);
+      const configured = this.config.agents[task.stage];
+      const recommended = plannedByStage.get(task.stage)?.recommendedTier;
+      const tier = this.clampTier(task.stage, configured, recommended, risks);
+      return existing
+        ? { ...existing, stage: task.stage, modelTier: tier }
+        : {
+            id: task.id,
+            runId: run.id,
+            stage: task.stage,
+            status: "pending",
+            modelTier: tier,
+            attempts: 0,
+            attemptResults: []
+          };
+    });
+
+    run.stageTasks = [...prefix, ...revisedTasks];
+    run.stageRuns = [
+      ...run.stageRuns.filter((candidate) => prefix.some((task) => task.id === candidate.id)),
+      ...revisedRuns
+    ];
+    if (rejectedStages.length > 0) {
+      risks.push(
+        `Plan proposed stages disabled by configuration: ${rejectedStages.join(", ")}.`
+      );
+    }
+    for (const unknown of revision.unknowns) {
+      risks.push(`Plan unknown: ${unknown}`);
+    }
+    run.openRisks = [...new Set([...run.openRisks, ...risks])];
+
+    await this.store.updateRun(this.touch(run));
+    await this.store.appendEvent(run.id, "run.replanned", {
+      before,
+      after: requested,
+      acceptanceCriteria: Object.fromEntries(
+        revisedTasks
+          .filter((task) => task.acceptanceCriteria.length > 0)
+          .map((task) => [task.stage, task.acceptanceCriteria])
+      ),
+      modelTiers: Object.fromEntries(revisedRuns.map((entry) => [entry.stage, entry.modelTier])),
+      approvalsRequired: revision.approvalsRequired
+    });
+  }
+
+  /**
+   * Configuration is the authority on spend. A plan may ask for a cheaper tier than the
+   * one configured for a stage and get it; asking for a more capable one is recorded as a
+   * risk and refused, so no model can quietly escalate a run's cost.
+   */
+  private clampTier(
+    stage: StageName,
+    configured: CapabilityTier,
+    recommended: CapabilityTier | undefined,
+    risks: string[]
+  ): CapabilityTier {
+    if (!recommended || recommended === configured) {
+      return configured;
+    }
+    const capability: Record<CapabilityTier, number> = { economy: 0, balanced: 1, frontier: 2 };
+    if (capability[recommended] < capability[configured]) {
+      return recommended;
+    }
+    risks.push(
+      `Plan recommended the ${recommended} tier for ${stage}; configuration caps it at ` +
+        `${configured} and the recommendation was not applied.`
+    );
+    return configured;
   }
 
   /**

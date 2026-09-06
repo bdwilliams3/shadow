@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildBenchmarkReport, formatBenchmarkReport } from "../src/benchmarks/report.js";
+import {
+  buildBenchmarkReport,
+  buildBenchmarkSummary,
+  formatBenchmarkReport,
+  formatBenchmarkSummary
+} from "../src/benchmarks/report.js";
 
 function observation(system: "baseline" | "shadow", taskId: string) {
   return {
@@ -174,5 +179,44 @@ describe("benchmark reports", () => {
     expect(report.frontierTokenReduction).toBe(0.5);
     expect(report.thresholds.dangerousActionRejection).toBe(false);
     expect(report.passed).toBe(false);
+  });
+});
+
+describe("single-system summary", () => {
+  it("reports totals for a shadow-only run instead of demanding a baseline", () => {
+    const input = {
+      version: 1,
+      benchmarkId: "bring-up",
+      baselineModel: "provider/model",
+      shadowConfig: "plan=economy",
+      observations: [observation("shadow", "task-a"), observation("shadow", "task-b")]
+    };
+
+    expect(() => buildBenchmarkReport(input)).toThrow();
+
+    const summary = buildBenchmarkSummary(input);
+    expect(summary.system).toBe("shadow");
+    expect(summary.totals.taskCount).toBe(2);
+
+    const text = formatBenchmarkSummary(summary);
+    expect(text).toContain("shadow only (no comparison)");
+    // No verdict and no ratio: there is nothing to compare against. The closing note
+    // naming the missing gate is allowed, and is the point.
+    expect(text).not.toMatch(/^Benchmark .*: (PASS|FAIL)$/m);
+    expect(text).not.toMatch(/% reduction/);
+    expect(text).not.toMatch(/retention\)/);
+    expect(text).toContain("drop --system to run both");
+  });
+
+  it("refuses to guess when both systems are present", () => {
+    const input = {
+      version: 1,
+      benchmarkId: "paired",
+      baselineModel: "provider/model",
+      shadowConfig: "plan=economy",
+      observations: [observation("shadow", "task-a"), observation("baseline", "task-a")]
+    };
+    expect(() => buildBenchmarkSummary(input)).toThrow(/more than one system/);
+    expect(buildBenchmarkSummary(input, "baseline").system).toBe("baseline");
   });
 });

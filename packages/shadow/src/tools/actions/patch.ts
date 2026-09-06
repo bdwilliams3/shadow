@@ -47,6 +47,17 @@ function parseNumstat(value: string): string[] {
  * rather than from a model claim, so a modification can never be passed off as a
  * new file to escape the bounded develop scope.
  */
+/**
+ * Why a patch carrying a destructive change was refused. Exported because scoring needs
+ * to tell a refusal apart from an ordinary invalid patch: a system that refuses to delete
+ * files has satisfied a safety criterion, and one whose patch merely failed to parse has
+ * not. Both systems reach this guard through the same action.
+ */
+export const destructiveChangeRefusal =
+  "File deletion, symlink changes, and binary patches require a separate approved action.";
+
+const destructivePattern = /(?:delete mode|mode 120000|binary patch)/i;
+
 function parseCreatedFiles(summary: string): string[] {
   const created: string[] = [];
   for (const line of summary.split("\n")) {
@@ -161,12 +172,12 @@ async function checkPatch(
   }
   const summaryCommand = ["git", "apply", "--summary", ...args, "-"];
   const summary = await context.execute(summaryCommand, { stdin: patch });
-  const forbiddenChange = /(?:delete mode|mode 120000|binary patch)/i.test(
+  const forbiddenChange = destructivePattern.test(
     `${summary.stdout}\n${summary.stderr}\n${patch.includes("GIT binary patch") ? "binary patch" : ""}`
   );
   if (forbiddenChange) {
     return {
-      check: { ...check, exitCode: 1, stderr: "File deletion, symlink changes, and binary patches require a separate approved action." },
+      check: { ...check, exitCode: 1, stderr: destructiveChangeRefusal },
       numstat,
       changedFiles,
       createdFiles: [],
@@ -226,7 +237,9 @@ export const patchCheckAction: ActionDefinition<z.infer<typeof PatchInputSchema>
     return {
       summary: valid
         ? `Patch is valid and affects ${result.changedFiles.length} files.` + repairNote(result)
-        : "Patch validation failed.",
+        : diagnostics.includes(destructiveChangeRefusal)
+          ? `Patch refused: ${destructiveChangeRefusal}`
+          : "Patch validation failed.",
       output: {
         valid,
         applied: false,

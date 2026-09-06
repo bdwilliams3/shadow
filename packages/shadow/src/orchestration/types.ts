@@ -117,6 +117,32 @@ export const StageTaskSchema = z.object({
 });
 export type StageTask = z.infer<typeof StageTaskSchema>;
 
+/**
+ * A revision of the not-yet-executed part of the lifecycle graph, produced by the Plan
+ * stage. It is a *proposal*: the orchestrator filters, orders, and clamps it before any
+ * of it takes effect, and it can never reach a stage that has already run.
+ */
+export const PlannedStageTaskSchema = z.object({
+  stage: StageNameSchema,
+  goal: z.string().min(1),
+  acceptanceCriteria: z.array(z.string().min(1)).default([]),
+  /**
+   * A capability tier the plan believes this stage needs. Honoured only when it is at or
+   * below the configured tier for the stage; an upgrade is recorded as an open risk
+   * instead of applied, so configuration stays the authority on spend.
+   */
+  recommendedTier: CapabilityTierSchema.optional()
+});
+export type PlannedStageTask = z.infer<typeof PlannedStageTaskSchema>;
+
+export const PlanRevisionSchema = z.object({
+  stages: z.array(StageNameSchema).min(1),
+  tasks: z.array(PlannedStageTaskSchema).default([]),
+  unknowns: z.array(z.string()).default([]),
+  approvalsRequired: z.array(z.string()).default([])
+});
+export type PlanRevision = z.infer<typeof PlanRevisionSchema>;
+
 export const StageResultSchema = z.object({
   status: StageStatusSchema,
   summary: z.string(),
@@ -128,6 +154,11 @@ export const StageResultSchema = z.object({
   testResults: z.array(z.string()).default([]),
   openRisks: z.array(z.string()).default([]),
   recommendedNextStage: StageNameSchema.optional(),
+  /**
+   * Set only by the Plan stage. Optional so results persisted before the model-backed
+   * planner existed still parse.
+   */
+  planRevision: PlanRevisionSchema.optional(),
   usage: UsageTotalsSchema.default(defaultUsageTotals)
 });
 export type StageResult = z.infer<typeof StageResultSchema>;

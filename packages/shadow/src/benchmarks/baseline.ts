@@ -34,7 +34,10 @@ export const defaultBaselineBudget: Budget = {
 };
 
 export const BaselineOutputSchema = z.object({
-  summary: z.string().min(1),
+  // Relaxed for the same reason as the agents': a mandatory summary lets one empty field
+  // discard an otherwise usable response. `patch` stays mandatory — the unharnessed
+  // baseline having no way to decline is the property under comparison.
+  summary: z.string().default(""),
   patch: z.string().min(1).max(500_000),
   decisions: z.array(z.string()).default([]),
   openRisks: z.array(z.string()).default([])

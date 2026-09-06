@@ -16,7 +16,6 @@ import type { ActionRunner } from "../tools/runner.js";
 import type { GitStatusSummary } from "../tools/actions/git.js";
 import type { PatchResult } from "../tools/actions/patch.js";
 import type { QualityResult } from "../tools/actions/quality.js";
-import type { RepositoryInventory } from "../tools/actions/repository.js";
 import type { DependencyScanResult, SecretScanResult } from "../tools/actions/security.js";
 import type { TestSelection } from "../tools/actions/tests.js";
 
@@ -30,7 +29,11 @@ const noUsage = {
 const maxCreatedFiles = 10;
 
 export const DevelopOutputSchema = z.object({
-  summary: z.string().min(1),
+  // Not required. A weak model that declines correctly but leaves the summary empty had
+  // its whole response rejected by validation, which destroyed the refusal and failed the
+  // stage with a schema error. `patch` was made optional so refusing would be cheap; a
+  // mandatory summary reintroduced the same failure through another door.
+  summary: z.string().default(""),
   // Empty when the agent declines. Requiring a non-empty patch left the model no way to
   // refuse impermissible work, so it fabricated one and ran to the output ceiling.
   patch: z.string().max(500_000).default(""),
@@ -51,42 +54,6 @@ const developSystemPrompt = [
   "Decline rather than improvise: if the request asks for deletion, writes outside the workspace, actions on systems you cannot see, or anything the supplied files cannot express, return an empty patch with a one-sentence declineReason. A declined request costs one call; a fabricated patch costs several.",
   "Do not narrate tool use. Keep decisions and risks concise."
 ].join("\n");
-
-export class PlanAgent implements Agent {
-  constructor(
-    private readonly actions: ActionRunner,
-    private readonly databasePath = ".shadow/shadow.db",
-    private readonly exclusions: string[] = []
-  ) {}
-
-  async run(task: StageTask, context: StageContext): Promise<StageResult> {
-    const inspection = await this.actions.run<RepositoryInventory>("repository.inspect", {
-      databasePath: this.databasePath,
-      exclusions: this.exclusions
-    }, {
-      dryRun: context.dryRun
-    });
-    const inventory = inspection.output;
-    return {
-      status: "completed",
-      summary: inventory
-        ? `Planned lifecycle work using an inventory of ${inventory.fileCount} relevant files.`
-        : `Planned lifecycle work for: ${context.request}`,
-      decisions: [
-        "Use capability tiers rather than hard-coded model names.",
-        "Pass structured artifacts between stages.",
-        "Keep deterministic actions behind the tool gateway."
-      ],
-      artifacts: [...task.inputs, ...inspection.artifacts],
-      changedFiles: [],
-      toolCalls: [inspection.record],
-      modelCalls: [],
-      testResults: [],
-      openRisks: inspection.record.status === "failed" ? [inspection.record.summary] : [],
-      usage: noUsage
-    };
-  }
-}
 
 export class DevelopAgent implements Agent {
   constructor(

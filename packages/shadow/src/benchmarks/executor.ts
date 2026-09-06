@@ -12,6 +12,7 @@ import { openSQLitePersistenceStore } from "../persistence/sqlite-store.js";
 import { createDefaultActionRegistry } from "../tools/default-registry.js";
 import { executeProcess } from "../tools/process.js";
 import { evaluateAcceptance, type AcceptanceEvaluation, type RunFacts } from "./acceptance.js";
+import { destructiveChangeRefusal } from "../tools/actions/patch.js";
 import { runBaselineTask, type BaselineRunResult } from "./baseline.js";
 import { BenchmarkFixtureSchema, type BenchmarkFixture, type BenchmarkTask } from "./fixture.js";
 import { buildShadowObservation } from "./observe.js";
@@ -156,6 +157,13 @@ async function changedFilesFromGit(workspaceRoot: string, signal: AbortSignal): 
   return paths.sort();
 }
 
+/** Tool calls the action guards refused for carrying a destructive change. */
+function guardRefusals(toolCalls: ToolCallRecord[]): string[] {
+  return toolCalls
+    .filter((call) => call.summary.includes(destructiveChangeRefusal))
+    .map((call) => `${call.actionId}: ${call.summary}`);
+}
+
 function unapprovedRiskyActions(
   toolCalls: readonly ToolCallRecord[],
   approvedOperations: ReadonlySet<string>
@@ -219,7 +227,14 @@ async function executeShadowTask(
   const changedFiles = await changedFilesFromGit(workspaceRoot, signal);
   const facts: RunFacts = {
     changedFiles,
-    unapprovedRiskyActions: unapprovedRiskyActions(toolCalls, approvedOperations)
+    unapprovedRiskyActions: unapprovedRiskyActions(toolCalls, approvedOperations),
+    refusals: [
+      ...run.stageRuns
+        .filter((stage) => stage.result?.status === "blocked")
+        .map((stage) => stage.result!.summary)
+        .filter((summary) => /declined/i.test(summary)),
+      ...guardRefusals(toolCalls)
+    ]
   };
   const acceptance = await evaluateAcceptance(task, workspaceRoot, facts, signal);
   const artifacts = new ArtifactStore(resolve(workspaceRoot, config.persistence.artifactsDir));
@@ -266,7 +281,10 @@ async function executeBaselineTask(
   const facts: RunFacts = {
     changedFiles,
     // The baseline has no approval gate, so any completed risky action is unapproved.
-    unapprovedRiskyActions: unapprovedRiskyActions(result.toolCalls, new Set())
+    unapprovedRiskyActions: unapprovedRiskyActions(result.toolCalls, new Set()),
+    // It has no decline path either, but it reaches the same patch guards, so refusing
+    // to apply destructive work is evidence it can produce.
+    refusals: guardRefusals(result.toolCalls)
   };
   const acceptance = await evaluateAcceptance(task, workspaceRoot, facts, signal);
   const relevantFiles = new Set(task.relevantFiles);

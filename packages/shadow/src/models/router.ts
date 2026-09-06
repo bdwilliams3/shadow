@@ -37,6 +37,23 @@ export interface StructuredModelResult<T> {
   record: ModelCallRecord;
 }
 
+/**
+ * A Zod failure's `message` is a JSON dump of every issue. Surfacing it raw put a
+ * multi-line array where a stage summary belongs; this reduces it to one sentence naming
+ * the fields that were wrong.
+ */
+export function describeSchemaFailure(schemaName: string, error: unknown): string {
+  if (!(error instanceof z.ZodError)) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  const issues = error.issues
+    .slice(0, 5)
+    .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+    .join("; ");
+  const more = error.issues.length > 5 ? ` (+${error.issues.length - 5} more)` : "";
+  return `Model response did not match ${schemaName}: ${issues}${more}`;
+}
+
 export class ModelRoutingError extends Error {
   constructor(message: string, readonly record: ModelCallRecord) {
     super(message);
@@ -175,7 +192,7 @@ export class ModelRouter {
         }
       };
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = describeSchemaFailure(call.schemaName, error);
       throw new ModelRoutingError(reason, {
         ...baseRecord,
         status: "failed",

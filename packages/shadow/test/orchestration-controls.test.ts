@@ -9,6 +9,7 @@ import type { ModelProvider } from "../src/models/provider.js";
 import { TestRunSummarySchema } from "../src/mcp/tests/types.js";
 import type { TestRunRequest } from "../src/mcp/tests/types.js";
 import { LifecycleOrchestrator } from "../src/orchestration/orchestrator.js";
+import { withPlanStage } from "./support/plan-provider.js";
 import { SQLitePersistenceStore } from "../src/persistence/sqlite-store.js";
 
 const execFileAsync = promisify(execFile);
@@ -43,55 +44,75 @@ function response(patch: string) {
 }
 
 describe("orchestration controls", () => {
-  it("persists an approval and resumes only the blocked stage after approval", async () => {
+  it("pauses each model-backed stage for its own approval and resumes only that stage", async () => {
     const workspace = await fixtureWorkspace();
     const config = structuredClone(defaultConfig);
     config.approvals.requireApprovalForNetwork = true;
     config.lifecycle.maxModelCallsPerStage = 1;
-    let providerCalls = 0;
-    const provider: ModelProvider = {
+    let developCalls = 0;
+    const provider = withPlanStage({
       async complete() {
-        providerCalls += 1;
+        developCalls += 1;
         return response(updatePatch());
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
       providers: new Map([["default", provider]])
     });
 
-    const waiting = await orchestrator.run({
+    // Plan is the first stage to reach a provider, and it does so while the run is still
+    // PLANNED, so this also covers the PLANNED -> AWAITING_APPROVAL transition.
+    const awaitingPlan = await orchestrator.run({
       request: "change hello.txt from old to new",
       workspaceRoot: workspace,
       dryRun: false
     });
 
-    expect(waiting.state).toBe("AWAITING_APPROVAL");
-    expect(waiting.approvals).toHaveLength(1);
-    expect(waiting.approvals[0]).toMatchObject({ operation: "model.complete", status: "pending" });
-    expect(providerCalls).toBe(0);
-    const planAttempts = waiting.stageRuns.find((stage) => stage.stage === "plan")?.attempts;
+    expect(awaitingPlan.state).toBe("AWAITING_APPROVAL");
+    expect(awaitingPlan.approvals).toHaveLength(1);
+    expect(awaitingPlan.approvals[0]).toMatchObject({
+      stage: "plan",
+      operation: "model.complete",
+      status: "pending"
+    });
+    expect(developCalls).toBe(0);
 
-    await store.resolveApproval(waiting.id, waiting.approvals[0]!.id, "approved");
-    const completed = await orchestrator.resume(waiting.id);
+    await store.resolveApproval(awaitingPlan.id, awaitingPlan.approvals[0]!.id, "approved");
+    const awaitingDevelop = await orchestrator.resume(awaitingPlan.id);
+
+    // Approving Plan's call does not approve Develop's: each stage is asked separately.
+    expect(awaitingDevelop.state).toBe("AWAITING_APPROVAL");
+    expect(awaitingDevelop.approvals).toHaveLength(2);
+    expect(awaitingDevelop.approvals[1]).toMatchObject({
+      stage: "develop",
+      operation: "model.complete",
+      status: "pending"
+    });
+    const planAttempts = awaitingDevelop.stageRuns.find((stage) => stage.stage === "plan")?.attempts;
+    expect(developCalls).toBe(0);
+
+    await store.resolveApproval(awaitingDevelop.id, awaitingDevelop.approvals[1]!.id, "approved");
+    const completed = await orchestrator.resume(awaitingDevelop.id);
 
     expect(completed.state).toBe("COMPLETED");
-    expect(completed.approvals[0]?.status).toBe("approved");
+    expect(completed.approvals.every((approval) => approval.status === "approved")).toBe(true);
+    // Plan is not re-run once it has completed.
     expect(completed.stageRuns.find((stage) => stage.stage === "plan")?.attempts).toBe(planAttempts);
     expect(completed.stageRuns.find((stage) => stage.stage === "develop")?.attempts).toBe(2);
-    expect(providerCalls).toBe(1);
+    expect(developCalls).toBe(1);
     expect(await readFile(join(workspace, "hello.txt"), "utf8")).toBe("new\n");
   });
 
   it("retries a failed Develop result within configured limits", async () => {
     const workspace = await fixtureWorkspace();
     let providerCalls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         providerCalls += 1;
         return response(providerCalls === 1 ? "not a patch" : updatePatch());
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     let testRequest: TestRunRequest | undefined;
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
@@ -137,7 +158,7 @@ describe("orchestration controls", () => {
     config.budgets.stage.maxTotalTokens = 3_000;
     config.budgets.stage.reservedFrontierTokens = 0;
     let providerCalls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         providerCalls += 1;
         return {
@@ -145,7 +166,7 @@ describe("orchestration controls", () => {
           usage: { inputTokens: 2_500, outputTokens: 100, estimatedCostUsd: 0.001 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const run = await new LifecycleOrchestrator(config, store, {
       providers: new Map([["default", provider]])
@@ -170,10 +191,10 @@ describe("orchestration controls", () => {
     const providerStarted = new Promise<AbortSignal | undefined>((resolve) => {
       started = resolve;
     });
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete(request) {
         started(request.signal);
-        return new Promise((_resolve, reject) => {
+        return new Promise<never>((_resolve, reject) => {
           request.signal?.addEventListener(
             "abort",
             () => reject(new DOMException("cancelled", "AbortError")),
@@ -181,7 +202,7 @@ describe("orchestration controls", () => {
           );
         });
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
       providers: new Map([["default", provider]]),

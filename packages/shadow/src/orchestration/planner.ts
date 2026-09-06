@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ShadowConfig } from "../config/schema.js";
-import type { StageName, StageTask } from "./types.js";
+import type { Budget, StageName, StageTask } from "./types.js";
 
 export interface PlannedWorkflow {
   stages: StageTask[];
@@ -9,6 +9,83 @@ export interface PlannedWorkflow {
   risks: string[];
 }
 
+/**
+ * Tools a stage may use. This table is the authority for both the deterministic bootstrap
+ * graph and any revision the Plan stage proposes: a plan may choose *which* stages run and
+ * what they must achieve, never what they are permitted to touch.
+ */
+export function allowedToolsFor(stage: StageName): string[] {
+  switch (stage) {
+    case "plan":
+      return ["repository.inspect", "git.status"];
+    case "design":
+      return ["context.select"];
+    case "develop":
+      return ["context.select", "context.verify", "git.status", "patch.check", "patch.apply"];
+    case "test":
+      return ["git.status", "tests.select", "mcp.tests.run_tests", "quality.test"];
+    case "validate":
+      return ["git.status", "quality.typecheck", "security.secrets", "security.dependencies"];
+    case "deploy":
+      return ["deploy.execute", "deploy.rollback"];
+    case "document":
+      return ["context.select", "context.verify", "patch.check", "patch.apply"];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Stages backed by a model. Plan, Design, Develop, and Document reach a provider; Test,
+ * Validate, and Deploy are deterministic and their configured tier is never consulted.
+ */
+const modelBackedStages = new Set<StageName>(["plan", "design", "develop", "document"]);
+
+export function stageCallsModel(stage: StageName): boolean {
+  return modelBackedStages.has(stage);
+}
+
+/** Write permission is a property of the stage and the run, never of a model's proposal. */
+export function writePermissionsFor(stage: StageName, dryRun: boolean): boolean {
+  return (stage === "develop" || stage === "deploy" || stage === "document") && !dryRun;
+}
+
+const sharedConstraints = [
+  "Do not pass entire chat transcripts between stages.",
+  "Persist structured stage results and audit events."
+];
+
+export interface StageTaskInput {
+  runId: string;
+  stage: StageName;
+  goal: string;
+  budget: Budget;
+  dryRun: boolean;
+  acceptanceCriteria?: string[];
+  id?: string;
+}
+
+export function createStageTask(input: StageTaskInput): StageTask {
+  return {
+    id: input.id ?? randomUUID(),
+    runId: input.runId,
+    stage: input.stage,
+    goal: input.goal,
+    inputs: [],
+    constraints: [...sharedConstraints],
+    allowedTools: allowedToolsFor(input.stage),
+    writePermissions: writePermissionsFor(input.stage, input.dryRun),
+    acceptanceCriteria: input.acceptanceCriteria ?? [],
+    budget: input.budget,
+    retryCount: 0
+  };
+}
+
+/**
+ * The deterministic bootstrap graph. A run needs durable stage tasks before any stage
+ * executes, so this keyword classification runs first and the model-backed Plan stage
+ * revises what remains. It is also the fallback when Plan cannot reach a model.
+ */
 export function planWorkflow(
   runId: string,
   request: string,
@@ -31,9 +108,8 @@ export function planWorkflow(
   const enabled = desiredStages.filter((stage) => config.lifecycle.enabledStages.includes(stage));
   // These describe Shadow, not the user's change. Handing them to a model as the task's
   // acceptance criteria made it decline ordinary edits for lacking "orchestration,
-  // persistence, budgeting, and policy-evaluation components". Real per-task criteria
-  // require a model-backed Plan stage, which does not exist yet; until then stage tasks
-  // carry none and agents receive only the request.
+  // persistence, budgeting, and policy-evaluation components". They stay run-level audit
+  // records; per-task criteria come from the model-backed Plan stage.
   const invariants = [
     "The requested work is represented as a durable run.",
     "Each selected lifecycle stage records a structured result.",
@@ -46,37 +122,15 @@ export function planWorkflow(
     : [];
 
   return {
-    stages: enabled.map((stage) => ({
-      id: randomUUID(),
-      runId,
-      stage,
-      goal: request,
-      inputs: [],
-      constraints: [
-        "Do not pass entire chat transcripts between stages.",
-        "Persist structured stage results and audit events."
-      ],
-      allowedTools:
-        stage === "plan"
-          ? ["repository.inspect"]
-          : stage === "design"
-            ? ["context.select"]
-          : stage === "develop"
-            ? ["context.select", "context.verify", "git.status", "patch.check", "patch.apply"]
-            : stage === "test"
-              ? ["git.status", "tests.select", "mcp.tests.run_tests", "quality.test"]
-              : stage === "validate"
-                ? ["git.status", "quality.typecheck", "security.secrets", "security.dependencies"]
-                : stage === "deploy"
-                  ? ["deploy.execute", "deploy.rollback"]
-                : stage === "document"
-                  ? ["context.select", "context.verify", "patch.check", "patch.apply"]
-                : [],
-      writePermissions: (stage === "develop" || stage === "deploy" || stage === "document") && !dryRun,
-      acceptanceCriteria: [],
-      budget: config.budgets.stage,
-      retryCount: 0
-    })),
+    stages: enabled.map((stage) =>
+      createStageTask({
+        runId,
+        stage,
+        goal: request,
+        budget: config.budgets.stage,
+        dryRun
+      })
+    ),
     invariants,
     risks
   };

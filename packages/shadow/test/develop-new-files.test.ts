@@ -8,6 +8,7 @@ import { ArtifactStore } from "../src/artifacts/store.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { ModelProvider } from "../src/models/provider.js";
 import { LifecycleOrchestrator } from "../src/orchestration/orchestrator.js";
+import { withPlanStage } from "./support/plan-provider.js";
 import { SQLitePersistenceStore } from "../src/persistence/sqlite-store.js";
 import type { PatchResult } from "../src/tools/actions/patch.js";
 import { createDefaultActionRegistry } from "../src/tools/default-registry.js";
@@ -61,7 +62,7 @@ function providerReturning(patch: string): ModelProvider {
 async function runDevelop(workspace: string, provider: ModelProvider) {
   const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
   const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
-    providers: new Map([["default", provider]])
+    providers: new Map([["default", withPlanStage(provider)]])
   });
   const run = await orchestrator.run({
     request: "change hello.txt and add a notes file",
@@ -136,7 +137,7 @@ describe("develop new-file creation", () => {
   it("blocks the run when Develop declines instead of fabricating a patch", async () => {
     const workspace = await buildWorkspace();
     let calls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         calls += 1;
         return {
@@ -150,7 +151,7 @@ describe("develop new-file creation", () => {
           usage: { inputTokens: 100, outputTokens: 20, estimatedCostUsd: 0 }
         };
       }
-    };
+    });
 
     const { run, develop } = await runDevelop(workspace, provider);
 

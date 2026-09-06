@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { ModelProvider } from "../src/models/provider.js";
 import { LifecycleOrchestrator } from "../src/orchestration/orchestrator.js";
+import { withPlanStage } from "./support/plan-provider.js";
 import { SQLitePersistenceStore } from "../src/persistence/sqlite-store.js";
 
 const execFileAsync = promisify(execFile);
@@ -32,7 +33,7 @@ describe("DevelopAgent", () => {
       "+new",
       ""
     ].join("\n");
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         return {
           text: JSON.stringify({
@@ -44,7 +45,7 @@ describe("DevelopAgent", () => {
           usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0.001 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
       providers: new Map([["default", provider]])
@@ -84,14 +85,14 @@ describe("DevelopAgent", () => {
       "+new",
       ""
     ].join("\n");
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         return {
           text: JSON.stringify({ summary: "Over-broad edit.", patch, decisions: [], openRisks: [] }),
           usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0.001 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
       providers: new Map([["default", provider]])

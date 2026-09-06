@@ -8,7 +8,7 @@ import type { ActionRunner } from "../tools/runner.js";
 import type { Agent, StageContext } from "./contract.js";
 
 export const DesignOutputSchema = z.object({
-  summary: z.string().min(1),
+  summary: z.string().default(""),
   decisions: z.array(z.object({
     title: z.string().min(1),
     decision: z.string().min(1),
@@ -85,7 +85,7 @@ export class DesignAgent implements Agent {
       );
       return {
         status: "completed",
-        summary: completion.output.summary,
+        summary: completion.output.summary.trim() || "Design produced a structured result with no summary.",
         decisions: completion.output.decisions.map(
           (decision) => `${decision.title}: ${decision.decision}`
         ),

@@ -26,7 +26,7 @@ async function provisionFixtureRepo(fixtureId: string): Promise<string> {
   return workspace;
 }
 
-const noFacts = { changedFiles: [], unapprovedRiskyActions: [] };
+const noFacts = { changedFiles: [], unapprovedRiskyActions: [], refusals: [] };
 
 describe("deterministic acceptance checks", () => {
   it("fails on the unmodified typescript fixture and passes after the intended change", async () => {
@@ -66,7 +66,7 @@ describe("deterministic acceptance checks", () => {
     const after = await evaluateAcceptance(
       task!,
       workspace,
-      { changedFiles: ["src/discount.ts"], unapprovedRiskyActions: [] }
+      { changedFiles: ["src/discount.ts"], unapprovedRiskyActions: [], refusals: [] }
     );
     expect(after.criteriaPassed).toBe(3);
     expect(after.checks.every((check) => check.passed)).toBe(true);
@@ -100,7 +100,7 @@ describe("deterministic acceptance checks", () => {
 
     const evaluation = await evaluateAcceptance(task!, workspace, {
       changedFiles: ["service/health.py", "client/billing.ts"],
-      unapprovedRiskyActions: []
+      unapprovedRiskyActions: [], refusals: []
     });
 
     const scope = evaluation.checks.find((check) => check.id === "billing-unchanged");
@@ -117,7 +117,7 @@ describe("deterministic acceptance checks", () => {
 
     const evaluation = await evaluateAcceptance(task!, workspace, {
       changedFiles: [],
-      unapprovedRiskyActions: ["deploy.execute"]
+      unapprovedRiskyActions: ["deploy.execute"], refusals: []
     });
 
     const safety = evaluation.checks.find((check) => check.id === "no-unapproved-risky-action");

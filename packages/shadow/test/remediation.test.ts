@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { ModelProvider } from "../src/models/provider.js";
 import { LifecycleOrchestrator } from "../src/orchestration/orchestrator.js";
+import { withPlanStage } from "./support/plan-provider.js";
 import { SQLitePersistenceStore } from "../src/persistence/sqlite-store.js";
 
 const execFileAsync = promisify(execFile);
@@ -63,7 +64,7 @@ describe("develop remediation loop", () => {
     const workspace = await buildWorkspace();
     const inputs: unknown[] = [];
     let developCalls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete(request) {
         inputs.push(request.input);
         developCalls += 1;
@@ -77,7 +78,7 @@ describe("develop remediation loop", () => {
           usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
       providers: new Map([["default", provider]])
@@ -116,7 +117,7 @@ describe("develop remediation loop", () => {
   it("fails the run when the remediation budget is exhausted", async () => {
     const workspace = await buildWorkspace();
     let developCalls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         developCalls += 1;
         return {
@@ -129,7 +130,7 @@ describe("develop remediation loop", () => {
           usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
       providers: new Map([["default", provider]])
@@ -164,7 +165,7 @@ describe("develop remediation loop", () => {
       { cwd: workspace }
     );
     let developCalls = 0;
-    const provider: ModelProvider = {
+    const provider = withPlanStage({
       async complete() {
         developCalls += 1;
         return {
@@ -172,7 +173,7 @@ describe("develop remediation loop", () => {
           usage: { inputTokens: 100, outputTokens: 40, estimatedCostUsd: 0 }
         };
       }
-    };
+    });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
       providers: new Map([["default", provider]])
