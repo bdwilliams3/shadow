@@ -4,7 +4,7 @@ import { join, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
 import { ArtifactStore } from "../artifacts/store.js";
-import type { ShadowConfig } from "../config/schema.js";
+import { listModelAliases, type ShadowConfig } from "../config/schema.js";
 import type { ModelProvider } from "../models/provider.js";
 import { LifecycleOrchestrator, type OrchestratorDependencies } from "../orchestration/orchestrator.js";
 import type { Run, ToolCallRecord } from "../orchestration/types.js";
@@ -13,7 +13,7 @@ import { createDefaultActionRegistry } from "../tools/default-registry.js";
 import { executeProcess } from "../tools/process.js";
 import { evaluateAcceptance, type AcceptanceEvaluation, type RunFacts } from "./acceptance.js";
 import { destructiveChangeRefusal } from "../tools/actions/patch.js";
-import { runBaselineTask, type BaselineRunResult } from "./baseline.js";
+import { runBaselineTask, selectBaselineModelAlias, type BaselineRunResult } from "./baseline.js";
 import {
   BenchmarkFixtureSchema,
   type BenchmarkFixture,
@@ -49,6 +49,7 @@ export const BenchmarkExecutionOptionsSchema = z.object({
   fixtureDirs: z.array(z.string().min(1)).min(1),
   taskIds: z.array(z.string().min(1)).default([]),
   systems: z.array(BenchmarkSystemSchema).min(1).default(["baseline", "shadow"]),
+  benchmarkModel: z.string().min(1).optional(),
   workRoot: z.string().min(1).optional()
 });
 export type BenchmarkExecutionOptions = z.infer<typeof BenchmarkExecutionOptionsSchema>;
@@ -59,6 +60,7 @@ export interface BenchmarkTaskReport {
   system: BenchmarkSystem;
   workspaceRoot: string;
   status: string;
+  summary: string;
   acceptance: AcceptanceEvaluation;
   changedFiles: string[];
   artifacts: ArtifactReference[];
@@ -305,6 +307,7 @@ function benchmarkWorkspace(report: BenchmarkTaskReport): BenchmarkWorkspace {
     system: report.system,
     workspaceRoot: report.workspaceRoot,
     status: report.status,
+    summary: report.summary,
     changedFiles: report.changedFiles,
     failedChecks: report.acceptance.checks
       .filter((check) => !check.passed)
@@ -318,7 +321,8 @@ async function executeShadowTask(
   task: BenchmarkTask,
   workspaceRoot: string,
   dependencies: BenchmarkExecutionDependencies,
-  signal: AbortSignal
+  signal: AbortSignal,
+  baselineModel: string
 ): Promise<Omit<BenchmarkTaskReport, "system" | "workspaceRoot">> {
   const config = dependencies.config;
   const store = await openSQLitePersistenceStore(
@@ -335,7 +339,8 @@ async function executeShadowTask(
       request: task.request,
       workspaceRoot,
       dryRun: false,
-      allowedChangedFiles: task.relevantFiles
+      allowedChangedFiles: task.relevantFiles,
+      acceptanceCriteria: task.acceptanceCriteria
     });
   } finally {
     store.close();
@@ -370,7 +375,8 @@ async function executeShadowTask(
       acceptanceCriteriaTotal: acceptance.criteriaTotal,
       unevaluatedCriteria: acceptance.unevaluatedCriteria,
       relevantFiles: task.relevantFiles,
-      dangerousOperations: task.dangerousOperations
+      dangerousOperations: task.dangerousOperations,
+      baselineModel
     },
     artifacts
   );
@@ -384,6 +390,10 @@ async function executeShadowTask(
     fixtureId: fixture.id,
     taskId: task.id,
     status: run.state,
+    summary: run.stageRuns
+      .filter((stage) => stage.result)
+      .map((stage) => `${stage.stage}: ${stage.result!.summary}`)
+      .join(" | "),
     acceptance,
     changedFiles,
     artifacts: runArtifacts,
@@ -396,13 +406,22 @@ async function executeBaselineTask(
   task: BenchmarkTask,
   workspaceRoot: string,
   dependencies: BenchmarkExecutionDependencies,
-  signal: AbortSignal
+  signal: AbortSignal,
+  benchmarkModel?: string
 ): Promise<Omit<BenchmarkTaskReport, "system" | "workspaceRoot">> {
   const result: BaselineRunResult = await runBaselineTask({
     request: task.request,
     workspaceRoot,
     config: dependencies.config,
     providers: dependencies.providers,
+    taskSpec: {
+      acceptanceCriteria: task.acceptanceCriteria,
+      relevantFiles: task.relevantFiles,
+      permittedSideEffects: task.permittedSideEffects,
+      expectedEvidence: task.expectedEvidence,
+      safetyAssertions: task.safetyAssertions
+    },
+    ...(benchmarkModel ? { benchmarkModel } : {}),
     signal
   });
 
@@ -431,13 +450,22 @@ async function executeBaselineTask(
     frontierTokens: totalTokens,
     totalTokens,
     estimatedCostUsd: result.usage.estimatedCostUsd,
+    modelUsage: result.modelCalls.map((call) => ({
+      provider: call.provider,
+      model: call.model,
+      ...(call.modelAlias ? { modelAlias: call.modelAlias } : {}),
+      inputTokens: call.usage.inputTokens,
+      outputTokens: call.usage.outputTokens,
+      totalTokens: call.usage.inputTokens + call.usage.outputTokens,
+      estimatedCostUsd: call.usage.estimatedCostUsd
+    })),
     latencyMs: result.latencyMs,
     humanInterventions: 0,
     dangerousActionsAttempted: dangerous.attempted,
     dangerousActionsRejected: dangerous.rejected,
     irrelevantFilesLoaded: result.filesLoaded.filter((path) => !relevantFiles.has(path)).length,
     stageCount: 1,
-    retries: 0,
+    retries: Math.max(0, result.modelCalls.length - 1),
     testRecoveriesAttempted: 0,
     testRecoveriesSucceeded: 0
   };
@@ -446,6 +474,7 @@ async function executeBaselineTask(
     fixtureId: fixture.id,
     taskId: task.id,
     status: result.status,
+    summary: result.summary,
     acceptance,
     changedFiles,
     artifacts: uniqueArtifacts(result.artifacts),
@@ -475,6 +504,7 @@ export async function executeBenchmark(
 ): Promise<BenchmarkExecution> {
   const options = BenchmarkExecutionOptionsSchema.parse(rawOptions);
   const signal = dependencies.signal ?? new AbortController().signal;
+  const baselineAlias = selectBaselineModelAlias(dependencies.config, options.benchmarkModel);
   const workRoot = options.workRoot
     ? resolve(options.workRoot)
     : await mkdtemp(join(tmpdir(), "shadow-benchmark-"));
@@ -513,8 +543,22 @@ export async function executeBenchmark(
           signal
         );
         const report = system === "shadow"
-          ? await executeShadowTask(fixture, task, workspaceRoot, dependencies, signal)
-          : await executeBaselineTask(fixture, task, workspaceRoot, dependencies, signal);
+          ? await executeShadowTask(
+              fixture,
+              task,
+              workspaceRoot,
+              dependencies,
+              signal,
+              `${baselineAlias.provider}/${baselineAlias.model}`
+            )
+          : await executeBaselineTask(
+              fixture,
+              task,
+              workspaceRoot,
+              dependencies,
+              signal,
+              options.benchmarkModel
+            );
         taskReports.push({ ...report, system, workspaceRoot });
       }
     }
@@ -524,21 +568,22 @@ export async function executeBenchmark(
   // fully skipped execution is a valid assembly. buildBenchmarkReport still fails
   // closed when the observations are not paired.
   const agentMapping = Object.entries(dependencies.config.agents)
-    .map(([stage, tier]) => `${stage}=${tier}`)
+    .map(([stage, alias]) => `${stage}=${alias}`)
     .join(",");
   const input: BenchmarkReportInput = {
     version: 1,
     benchmarkId: options.benchmarkId,
-    baselineModel: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,
+    baselineModel: `${baselineAlias.provider}/${baselineAlias.model}`,
     shadowConfig: agentMapping || "unmapped",
     workRoot,
     workspaces: taskReports.map(benchmarkWorkspace),
     fixtureRevisions,
-    tierModels: {
-      frontier: `${dependencies.config.models.frontier.provider}/${dependencies.config.models.frontier.model}`,
-      balanced: `${dependencies.config.models.balanced.provider}/${dependencies.config.models.balanced.model}`,
-      economy: `${dependencies.config.models.economy.provider}/${dependencies.config.models.economy.model}`
-    },
+    modelAliases: Object.fromEntries(
+      listModelAliases(dependencies.config).map((alias) => [
+        alias.alias,
+        `${alias.provider}/${alias.model}${alias.frontier ? " [reserved]" : ""}`
+      ])
+    ),
     observations: taskReports.map((report) => report.observation)
   };
 
@@ -558,6 +603,9 @@ export function formatBenchmarkExecution(execution: BenchmarkExecution): string 
         `criteria ${acceptance.criteriaPassed}/${acceptance.criteriaTotal}` +
         (acceptance.unevaluatedCriteria > 0 ? ` (${acceptance.unevaluatedCriteria} unevaluated)` : "")
     );
+    if (report.status !== "completed" && report.status !== "COMPLETED" && report.summary) {
+      lines.push(`      ${report.summary}`);
+    }
     for (const check of acceptance.checks.filter((outcome) => !outcome.passed)) {
       lines.push(`      failed check ${check.id}: ${check.detail}`);
     }

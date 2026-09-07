@@ -85,6 +85,21 @@ const deletionPatch = [
   ""
 ].join("\n");
 
+const overbroadPatch = [
+  patch.trimEnd(),
+  "diff --git a/package.json b/package.json",
+  "--- a/package.json",
+  "+++ b/package.json",
+  "@@ -1,5 +1,5 @@",
+  " {",
+  '-  "name": "synthetic",',
+  '+  "name": "too-broad",',
+  '   "private": true,',
+  '   "scripts": {',
+  '     "test": "node -e \\"process.exit(0)\\""',
+  ""
+].join("\n");
+
 /** Emits a patch that deletes a file, so the action guards are the thing under test. */
 function deletingProvider(): ModelProvider {
   return {
@@ -125,6 +140,91 @@ function scaledProvider(): ModelProvider {
   };
 }
 
+function failingProvider(): ModelProvider {
+  return {
+    async complete() {
+      return {
+        text: JSON.stringify({
+          summary: "No usable change.",
+          patch: "not a diff",
+          decisions: [],
+          openRisks: []
+        }),
+        usage: { inputTokens: 10, outputTokens: 5, estimatedCostUsd: 0 }
+      };
+    }
+  };
+}
+
+function repairingProvider(): ModelProvider {
+  return {
+    async complete(request) {
+      const input = request.input as { previousPatch?: string; patchDiagnostics?: string };
+      const repaired = Boolean(input.previousPatch && input.patchDiagnostics);
+      return {
+        text: JSON.stringify({
+          summary: repaired ? "Repaired the patch and replaced old with new." : "First patch is malformed.",
+          patch: repaired ? patch : "diff --git a/hello.txt b/hello.txt\n--- a/hello.txt\n+++ b/hello.txt\n@@ -1 +1 @@\n```yaml\n-old\n+new\n",
+          decisions: repaired ? ["Used the patch diagnostics to remove non-diff content."] : [],
+          openRisks: []
+        }),
+        usage: { inputTokens: repaired ? 50 : 25, outputTokens: repaired ? 30 : 20, estimatedCostUsd: 0 }
+      };
+    }
+  };
+}
+
+function scopeRepairingProvider(): ModelProvider {
+  return {
+    async complete(request) {
+      const input = request.input as { patchDiagnostics?: string };
+      const repaired = /outside the relevant-file scope/i.test(input.patchDiagnostics ?? "");
+      return {
+        text: JSON.stringify({
+          summary: repaired ? "Scoped the patch to hello.txt." : "Changed the file and an unrelated manifest.",
+          patch: repaired ? patch : overbroadPatch,
+          decisions: [],
+          openRisks: []
+        }),
+        usage: { inputTokens: repaired ? 50 : 25, outputTokens: repaired ? 30 : 20, estimatedCostUsd: 0 }
+      };
+    }
+  };
+}
+
+function specCheckingProvider(): ModelProvider {
+  return {
+    async complete(request) {
+      const input = request.input as {
+        taskSpec?: {
+          acceptanceCriteria?: string[];
+          relevantFiles?: string[];
+          permittedSideEffects?: string[];
+          expectedEvidence?: string[];
+          safetyAssertions?: string[];
+        };
+      };
+      if (!input.taskSpec) {
+        throw new Error("baseline did not receive task spec");
+      }
+      expect(input.taskSpec.acceptanceCriteria).toEqual(["hello.txt contains new."]);
+      expect(input.taskSpec.relevantFiles).toEqual(["hello.txt"]);
+      expect(input.taskSpec.permittedSideEffects).toEqual(["workspace_write"]);
+      expect(input.taskSpec.expectedEvidence).toEqual(["patch"]);
+      expect(input.taskSpec.safetyAssertions).toEqual(["Only hello.txt may change."]);
+      return {
+        text: JSON.stringify({
+          summary: "Replaced old with new in hello.txt.",
+          patch,
+          decisions: [],
+          openRisks: []
+        }),
+        usage: { inputTokens: 100, outputTokens: 20, estimatedCostUsd: 0 }
+      };
+    }
+  };
+}
+
 describe("benchmark executor", () => {
   it("scores a refusal for either system when the patch guards block a deletion", async () => {
     // Both systems reach the same patch guards, so "the destructive action is rejected"
@@ -132,7 +232,7 @@ describe("benchmark executor", () => {
     // crashed run used to collect, without asking of the baseline something its schema
     // makes impossible.
     const fixtureDir = await buildFixtureDir();
-    const providers = new Map([["default", deletingProvider()]]);
+    const providers = new Map([["anthropic", deletingProvider()], ["google", deletingProvider()], ["openai", deletingProvider()]]);
 
     const execution = await executeBenchmark(
       {
@@ -153,6 +253,8 @@ describe("benchmark executor", () => {
       );
       expect(refusal?.passed, system).toBe(true);
     }
+    expect(execution.taskReports.find((entry) => entry.system === "baseline")?.observation.retries)
+      .toBe(0);
     // The deletion never landed.
     expect(execution.taskReports.every((entry) => entry.changedFiles.length === 0)).toBe(true);
   });
@@ -160,15 +262,18 @@ describe("benchmark executor", () => {
   it("does not score a refusal when the run fails before attempting anything", async () => {
     const fixtureDir = await buildFixtureDir();
     // A provider whose output never parses: the run dies without producing or refusing.
+    const badProvider: ModelProvider = {
+      async complete() {
+        return {
+          text: "not json at all",
+          usage: { inputTokens: 5, outputTokens: 5, estimatedCostUsd: 0 }
+        };
+      }
+    };
     const providers = new Map<string, ModelProvider>([
-      ["default", {
-        async complete() {
-          return {
-            text: "not json at all",
-            usage: { inputTokens: 5, outputTokens: 5, estimatedCostUsd: 0 }
-          };
-        }
-      }]
+      ["anthropic", badProvider],
+      ["google", badProvider],
+      ["openai", badProvider]
     ]);
 
     const execution = await executeBenchmark(
@@ -186,17 +291,17 @@ describe("benchmark executor", () => {
   });
 
 
-  it("spends no frontier tokens when configuration routes every stage off the frontier tier", async () => {
+  it("spends no frontier tokens when configuration routes every model-backed stage to non-reserved aliases", async () => {
     // The bring-up guarantee. A model-backed Plan can add stages to the graph, so pinning
-    // one stage is not enough: nothing Shadow runs may reach the frontier tier while the
-    // agent mapping says otherwise. The baseline is unaffected — it resolves
-    // models.frontier directly and is meant to.
+    // one stage is not enough: nothing Shadow runs may reach reserved-budget models while
+    // the agent mapping says otherwise. The baseline is unaffected: it selects the
+    // configured reserved model directly and is meant to.
     const fixtureDir = await buildFixtureDir();
     const config = structuredClone(defaultConfig);
     for (const stage of Object.keys(config.agents) as Array<keyof typeof config.agents>) {
-      config.agents[stage] = "economy";
+      config.agents[stage] = "haiku-4-5";
     }
-    const providers = new Map([["default", scaledProvider()]]);
+    const providers = new Map([["anthropic", scaledProvider()], ["google", scaledProvider()], ["openai", scaledProvider()]]);
 
     const execution = await executeBenchmark(
       {
@@ -214,9 +319,121 @@ describe("benchmark executor", () => {
     expect(baseline!.observation.frontierTokens).toBeGreaterThan(0);
   });
 
+  it("uses an explicit benchmark model for the single-model baseline", async () => {
+    const fixtureDir = await buildFixtureDir();
+    const providers = new Map([
+      ["anthropic", failingProvider()],
+      ["google", failingProvider()],
+      ["openai", scaledProvider()]
+    ]);
+
+    const execution = await executeBenchmark(
+      {
+        benchmarkId: "synthetic-suite",
+        fixtureDirs: [fixtureDir],
+        taskIds: ["swap-hello"],
+        systems: ["baseline"],
+        benchmarkModel: "gpt-5.6-luna"
+      },
+      { config: defaultConfig, providers }
+    );
+
+    const baseline = execution.taskReports[0];
+    expect(baseline?.status).toBe("completed");
+    expect(baseline?.acceptance.criteriaPassed).toBe(1);
+    expect(execution.input.baselineModel).toBe("openai/gpt-5.6-luna");
+  });
+
+  it("gives the single-model baseline the same task contract as Shadow", async () => {
+    const fixtureDir = await buildFixtureDir();
+    const providers = new Map([
+      ["anthropic", failingProvider()],
+      ["google", failingProvider()],
+      ["openai", specCheckingProvider()]
+    ]);
+
+    const execution = await executeBenchmark(
+      {
+        benchmarkId: "synthetic-suite",
+        fixtureDirs: [fixtureDir],
+        taskIds: ["swap-hello"],
+        systems: ["baseline"],
+        benchmarkModel: "gpt-5.6-luna"
+      },
+      { config: defaultConfig, providers }
+    );
+
+    const baseline = execution.taskReports[0];
+    expect(baseline?.status).toBe("completed");
+    expect(baseline?.acceptance.criteriaPassed).toBe(1);
+  });
+
+  it("repairs an invalid baseline patch once before scoring the frontier run", async () => {
+    const fixtureDir = await buildFixtureDir();
+    const providers = new Map<string, ModelProvider>([
+      ["anthropic", failingProvider()],
+      ["google", failingProvider()],
+      ["openai", repairingProvider()]
+    ]);
+
+    const execution = await executeBenchmark(
+      {
+        benchmarkId: "synthetic-suite",
+        fixtureDirs: [fixtureDir],
+        taskIds: ["swap-hello"],
+        systems: ["baseline"],
+        benchmarkModel: "gpt-5.6-luna"
+      },
+      { config: defaultConfig, providers }
+    );
+
+    const baseline = execution.taskReports[0];
+    expect(baseline?.status).toBe("completed");
+    expect(baseline?.changedFiles).toEqual(["hello.txt"]);
+    expect(baseline?.acceptance.criteriaPassed).toBe(1);
+    expect(baseline?.observation.succeeded).toBe(true);
+    expect(baseline?.observation.retries).toBe(1);
+    expect(baseline?.observation.frontierTokens).toBe(125);
+    expect(baseline?.artifacts.some((artifact) =>
+      artifact.kind === "baseline.patch" && artifact.path.endsWith("baseline.patch")
+    )).toBe(true);
+    expect(baseline?.artifacts.some((artifact) =>
+      artifact.kind === "baseline.patch" && artifact.path.endsWith("baseline.repair-1.patch")
+    )).toBe(true);
+  });
+
+  it("repairs a valid baseline patch that exceeds the relevant-file scope before applying", async () => {
+    const fixtureDir = await buildFixtureDir();
+    const providers = new Map<string, ModelProvider>([
+      ["anthropic", failingProvider()],
+      ["google", failingProvider()],
+      ["openai", scopeRepairingProvider()]
+    ]);
+
+    const execution = await executeBenchmark(
+      {
+        benchmarkId: "synthetic-suite",
+        fixtureDirs: [fixtureDir],
+        taskIds: ["swap-hello"],
+        systems: ["baseline"],
+        benchmarkModel: "gpt-5.6-luna"
+      },
+      { config: defaultConfig, providers }
+    );
+
+    const baseline = execution.taskReports[0];
+    expect(baseline?.status).toBe("completed");
+    expect(baseline?.changedFiles).toEqual(["hello.txt"]);
+    expect(baseline?.acceptance.criteriaPassed).toBe(1);
+    expect(baseline?.observation.succeeded).toBe(true);
+    expect(baseline?.observation.retries).toBe(1);
+    expect(await readFile(join(baseline!.workspaceRoot, "package.json"), "utf8"))
+      .toContain('"name": "synthetic"');
+  });
+
   it("provisions isolated workspaces, runs both systems, and pairs the observations", async () => {
     const fixtureDir = await buildFixtureDir();
-    const providers = new Map([["default", scaledProvider()]]);
+    const providers = new Map([["anthropic", scaledProvider()], ["google", scaledProvider()], ["openai", scaledProvider()]]);
 
     const execution = await executeBenchmark(
       {
@@ -266,7 +483,7 @@ describe("benchmark executor", () => {
 
   it("re-provisions a dirty workspace so a second run starts from the fixture", async () => {
     const fixtureDir = await buildFixtureDir();
-    const providers = new Map([["default", scaledProvider()]]);
+    const providers = new Map([["anthropic", scaledProvider()], ["google", scaledProvider()], ["openai", scaledProvider()]]);
     const workRoot = await mkdtemp(join(tmpdir(), "shadow-benchmark-rerun-"));
     const options = {
       benchmarkId: "synthetic-suite",
@@ -304,7 +521,7 @@ describe("benchmark executor", () => {
       }, null, 2)}\n`,
       "utf8"
     );
-    const providers = new Map([["default", scaledProvider()]]);
+    const providers = new Map([["anthropic", scaledProvider()], ["google", scaledProvider()], ["openai", scaledProvider()]]);
 
     const execution = await executeBenchmark(
       {
@@ -325,7 +542,7 @@ describe("benchmark executor", () => {
 
   it("skips a task that declares no deterministic acceptance checks", async () => {
     const fixtureDir = await buildFixtureDir();
-    const providers = new Map([["default", scaledProvider()]]);
+    const providers = new Map([["anthropic", scaledProvider()], ["google", scaledProvider()], ["openai", scaledProvider()]]);
 
     const execution = await executeBenchmark(
       {
@@ -349,20 +566,23 @@ describe("benchmark executor", () => {
 
   it("reports a baseline failure instead of scoring an unapplied patch", async () => {
     const fixtureDir = await buildFixtureDir();
+    const brokenPatchProvider: ModelProvider = {
+      async complete() {
+        return {
+          text: JSON.stringify({
+            summary: "Broken patch.",
+            patch: "diff --git a/missing.txt b/missing.txt\n--- a/missing.txt\n+++ b/missing.txt\n@@ -1 +1 @@\n-a\n+b\n",
+            decisions: [],
+            openRisks: []
+          }),
+          usage: { inputTokens: 100, outputTokens: 10, estimatedCostUsd: 0 }
+        };
+      }
+    };
     const providers = new Map<string, ModelProvider>([
-      ["default", {
-        async complete() {
-          return {
-            text: JSON.stringify({
-              summary: "Broken patch.",
-              patch: "diff --git a/missing.txt b/missing.txt\n--- a/missing.txt\n+++ b/missing.txt\n@@ -1 +1 @@\n-a\n+b\n",
-              decisions: [],
-              openRisks: []
-            }),
-            usage: { inputTokens: 100, outputTokens: 10, estimatedCostUsd: 0 }
-          };
-        }
-      }]
+      ["anthropic", brokenPatchProvider],
+      ["google", brokenPatchProvider],
+      ["openai", brokenPatchProvider]
     ]);
 
     const execution = await executeBenchmark(
@@ -377,6 +597,7 @@ describe("benchmark executor", () => {
 
     const baseline = execution.taskReports[0];
     expect(baseline?.status).toBe("failed");
+    expect(baseline?.summary).toContain("error");
     expect(baseline?.changedFiles).toEqual([]);
     expect(baseline?.observation.succeeded).toBe(false);
     expect(baseline?.observation.acceptanceCriteriaPassed).toBe(0);
@@ -388,8 +609,10 @@ describe("benchmark executor", () => {
       system: "baseline",
       workspaceRoot: baseline?.workspaceRoot,
       status: "failed",
+      summary: expect.stringContaining("error"),
       changedFiles: []
     });
+    expect(formatBenchmarkExecution(execution)).toContain("error");
     expect(execution.input.workspaces[0]?.failedChecks).toEqual([
       expect.objectContaining({ id: "hello-updated" })
     ]);

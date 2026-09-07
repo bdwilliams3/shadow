@@ -194,7 +194,7 @@ describe("model-backed Plan stage", () => {
       })
     );
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     expect(run.state).toBe("COMPLETED");
@@ -219,12 +219,45 @@ describe("model-backed Plan stage", () => {
     expect(replanned?.payload).toMatchObject({ after: ["design", "develop", "test", "validate"] });
   });
 
+  it("preserves explicit acceptance criteria over broader Plan criteria", async () => {
+    const workspace = await fixtureWorkspace();
+    const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
+    const provider = providerFor(
+      planOutput({
+        stages: ["develop", "test", "validate"],
+        tasks: [
+          {
+            stage: "develop",
+            acceptanceCriteria: [
+              "hello.txt contains new",
+              "also update unrelated call sites"
+            ],
+            recommendedTier: "unspecified"
+          }
+        ]
+      })
+    );
+    const run = await new LifecycleOrchestrator(defaultConfig, store, {
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
+    }).run({
+      request: "change hello.txt from old to new",
+      workspaceRoot: workspace,
+      dryRun: false,
+      allowedChangedFiles: ["hello.txt"],
+      acceptanceCriteria: ["hello.txt contains new"]
+    });
+
+    expect(run.state).toBe("COMPLETED");
+    const develop = run.stageTasks.find((task) => task.stage === "develop");
+    expect(develop?.acceptanceCriteria).toEqual(["hello.txt contains new"]);
+  });
+
   it("drops a stage the plan omits and never re-adds Plan itself", async () => {
     const workspace = await fixtureWorkspace();
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const provider = providerFor(planOutput({ stages: ["plan", "develop"] }));
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     expect(run.state).toBe("COMPLETED");
@@ -239,18 +272,16 @@ describe("model-backed Plan stage", () => {
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const provider = providerFor(planOutput({ stages: ["develop", "deploy", "validate"] }));
     const run = await new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     expect(run.stageTasks.map((task) => task.stage)).toEqual(["plan", "develop", "validate"]);
     expect(run.openRisks.some((risk) => risk.includes("disabled by configuration"))).toBe(true);
   });
 
-  it("accepts a cheaper recommended tier but refuses an escalation", async () => {
+  it("keeps configured model aliases when Plan recommends old capability labels", async () => {
     const workspace = await fixtureWorkspace();
     const config = structuredClone(defaultConfig);
-    config.agents.develop = "balanced";
-    config.agents.validate = "balanced";
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const provider = providerFor(
       planOutput({
@@ -262,13 +293,13 @@ describe("model-backed Plan stage", () => {
       })
     );
     const run = await new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
-    // Downgrade honoured; escalation refused and surfaced rather than silently applied.
-    expect(run.stageRuns.find((stage) => stage.stage === "validate")?.modelTier).toBe("economy");
-    expect(run.stageRuns.find((stage) => stage.stage === "develop")?.modelTier).toBe("balanced");
-    expect(run.openRisks.some((risk) => risk.includes("recommended the frontier tier"))).toBe(true);
+    // Direct model aliases are configuration, not suggestions a model can rewrite.
+    expect(run.stageRuns.find((stage) => stage.stage === "validate")?.modelTier).toBe("gemini-2-5");
+    expect(run.stageRuns.find((stage) => stage.stage === "develop")?.modelTier).toBe("sonnet-4-6");
+    expect(run.openRisks.some((risk) => risk.includes("Plan recommended frontier"))).toBe(true);
   });
 
   it("keeps the deterministic graph and completes the run when the provider fails", async () => {
@@ -288,7 +319,7 @@ describe("model-backed Plan stage", () => {
       }
     };
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     // An unreachable planner costs the plan, not the run.
@@ -306,7 +337,7 @@ describe("model-backed Plan stage", () => {
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const provider = providerFor(planOutput({ stages: [] }));
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     expect(run.state).toBe("COMPLETED");
@@ -320,7 +351,11 @@ describe("model-backed Plan stage", () => {
     config.approvals.requireApprovalForNetwork = true;
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const run = await new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", providerFor(planOutput())]])
+      providers: new Map([
+        ["anthropic", providerFor(planOutput())],
+        ["google", providerFor(planOutput())],
+        ["openai", providerFor(planOutput())]
+      ])
     }).run({ request: "change hello.txt from old to new", workspaceRoot: workspace, dryRun: false });
 
     // An approval pause is a decision the user still has to make, not a failure to route
@@ -374,7 +409,7 @@ describe("declining with an empty summary", () => {
       }
     };
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({ request: "delete generated output outside the repo", workspaceRoot: workspace, dryRun: false });
 
     const develop = run.stageRuns.find((stage) => stage.stage === "develop");

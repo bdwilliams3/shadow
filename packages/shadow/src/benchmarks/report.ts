@@ -1,9 +1,13 @@
 import { z } from "zod";
-import {
-  ArtifactReferenceSchema,
-  CapabilityTierSchema,
-  type CapabilityTier
-} from "../orchestration/types.js";
+import { ArtifactReferenceSchema, ModelAliasSchema, UsageTotalsSchema, type ModelAlias } from "../orchestration/types.js";
+
+const ModelUsageSchema = UsageTotalsSchema.extend({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  modelAlias: ModelAliasSchema.optional(),
+  totalTokens: z.number().int().nonnegative()
+});
+export type ModelUsage = z.infer<typeof ModelUsageSchema>;
 
 export const BenchmarkObservationSchema = z.object({
   system: z.enum(["baseline", "shadow"]),
@@ -16,6 +20,7 @@ export const BenchmarkObservationSchema = z.object({
   frontierTokens: z.number().int().nonnegative(),
   totalTokens: z.number().int().nonnegative(),
   estimatedCostUsd: z.number().nonnegative(),
+  modelUsage: z.array(ModelUsageSchema).default([]),
   latencyMs: z.number().int().nonnegative(),
   humanInterventions: z.number().int().nonnegative(),
   dangerousActionsAttempted: z.number().int().nonnegative().default(0),
@@ -63,6 +68,7 @@ export const BenchmarkWorkspaceSchema = z.object({
   system: z.enum(["baseline", "shadow"]),
   workspaceRoot: z.string().min(1),
   status: z.string().min(1),
+  summary: z.string().default(""),
   changedFiles: z.array(z.string()).default([]),
   failedChecks: z.array(z.object({
     id: z.string().min(1),
@@ -90,12 +96,16 @@ export const BenchmarkReportInputSchema = z.object({
    */
   workspaces: z.array(BenchmarkWorkspaceSchema).default([]),
   /**
-   * What each capability tier resolved to when the run was taken. Optional so runs
+   * What each capability tier resolved to when an older run was taken. Optional so runs
    * recorded before this field still parse. Tiers deliberately collapsed onto one model
    * make every cost figure and every ratio between tiers synthetic, and this is what lets
    * the output say so instead of leaving a future reader to quote fiction.
    */
-  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
+  tierModels: z.record(ModelAliasSchema, z.string().min(1)).optional(),
+  /**
+   * What each direct model alias resolved to when this run was taken.
+   */
+  modelAliases: z.record(ModelAliasSchema, z.string().min(1)).optional(),
   /**
    * Fixture id to repository revision, as provisioned for this run. Optional so earlier
    * results still parse. Committing the fixture corpus is what makes a saved number
@@ -115,6 +125,7 @@ const AggregateSchema = z.object({
   frontierTokenPercentage: z.number().nonnegative(),
   totalTokens: z.number().int().nonnegative(),
   estimatedCostUsd: z.number().nonnegative(),
+  modelUsage: z.array(ModelUsageSchema).default([]),
   latencyMs: z.number().int().nonnegative(),
   medianHumanInterventions: z.number().nonnegative(),
   dangerousActionRejectionRate: z.number().nonnegative(),
@@ -127,7 +138,8 @@ const AggregateSchema = z.object({
 export const BenchmarkComparisonSchema = z.object({
   version: z.literal(1),
   benchmarkId: z.string().min(1),
-  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
+  tierModels: z.record(ModelAliasSchema, z.string().min(1)).optional(),
+  modelAliases: z.record(ModelAliasSchema, z.string().min(1)).optional(),
   fixtureRevisions: z.record(z.string(), z.string().min(1)).optional(),
   baselineModel: z.string().min(1),
   shadowConfig: z.string().min(1),
@@ -194,6 +206,7 @@ function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeo
     frontierTokenPercentage: ratio(frontierTokens, totalTokens),
     totalTokens,
     estimatedCostUsd: sum((observation) => observation.estimatedCostUsd),
+    modelUsage: aggregateModelUsage(observations.flatMap((observation) => observation.modelUsage)),
     latencyMs: sum((observation) => observation.latencyMs),
     medianHumanInterventions: median(observations.map((observation) => observation.humanInterventions)),
     dangerousActionRejectionRate: dangerousActionsAttempted === 0
@@ -209,11 +222,31 @@ function aggregate(observations: readonly BenchmarkObservation[]): z.infer<typeo
   };
 }
 
+function aggregateModelUsage(usages: readonly ModelUsage[]): ModelUsage[] {
+  const byModel = new Map<string, ModelUsage>();
+  for (const usage of usages) {
+    const key = `${usage.provider}\u0000${usage.model}\u0000${usage.modelAlias ?? ""}`;
+    const existing = byModel.get(key);
+    if (!existing) {
+      byModel.set(key, { ...usage });
+      continue;
+    }
+    existing.inputTokens += usage.inputTokens;
+    existing.outputTokens += usage.outputTokens;
+    existing.totalTokens += usage.totalTokens;
+    existing.estimatedCostUsd += usage.estimatedCostUsd;
+  }
+  return [...byModel.values()].sort((left, right) =>
+    `${left.provider}/${left.model}`.localeCompare(`${right.provider}/${right.model}`)
+  );
+}
+
 export const BenchmarkSummarySchema = z.object({
   version: z.literal(1),
   benchmarkId: z.string().min(1),
   system: z.enum(["baseline", "shadow"]),
-  tierModels: z.record(CapabilityTierSchema, z.string().min(1)).optional(),
+  tierModels: z.record(ModelAliasSchema, z.string().min(1)).optional(),
+  modelAliases: z.record(ModelAliasSchema, z.string().min(1)).optional(),
   totals: AggregateSchema
 });
 export type BenchmarkSummary = z.infer<typeof BenchmarkSummarySchema>;
@@ -244,6 +277,7 @@ export function buildBenchmarkSummary(rawInput: unknown, system?: "baseline" | "
     benchmarkId: input.benchmarkId,
     system: chosen,
     ...(input.tierModels ? { tierModels: input.tierModels } : {}),
+    ...(input.modelAliases ? { modelAliases: input.modelAliases } : {}),
     totals: aggregate(observations)
   });
 }
@@ -263,30 +297,39 @@ export function formatFixtureRevisions(
 }
 
 export function formatTierModels(
-  tierModels: Partial<Record<CapabilityTier, string>> | undefined
+  tierModels: Partial<Record<ModelAlias, string>> | undefined
 ): string | undefined {
   if (!tierModels) return undefined;
-  const entries = (["frontier", "balanced", "economy"] as const)
-    .filter((tier) => tierModels[tier])
-    .map((tier) => `${tier}=${tierModels[tier]}`);
+  const entries = Object.entries(tierModels).map(([tier, model]) => `${tier}=${model}`);
   return entries.length > 0 ? `Tiers: ${entries.join(", ")}` : undefined;
+}
+
+export function formatModelAliases(
+  modelAliases: Partial<Record<ModelAlias, string>> | undefined
+): string | undefined {
+  if (!modelAliases) return undefined;
+  const entries = Object.entries(modelAliases).map(([alias, model]) => `${alias}=${model}`);
+  return entries.length > 0 ? `Models: ${entries.join(", ")}` : undefined;
 }
 
 export function formatBenchmarkSummary(summary: BenchmarkSummary): string {
   const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
   const totals = summary.totals;
   const tiers = formatTierModels(summary.tierModels);
+  const models = formatModelAliases(summary.modelAliases);
   return [
+    ...(models ? [models] : []),
     ...(tiers ? [tiers] : []),
     `Benchmark ${summary.benchmarkId}: ${summary.system} only (no comparison)`,
     `Tasks: ${totals.taskCount}`,
-    `Frontier tokens: ${totals.frontierTokens} (${percentage(totals.frontierTokenPercentage)} of total)`,
+    `Reserved/baseline-model tokens: ${totals.frontierTokens} (${percentage(totals.frontierTokenPercentage)} of total)`,
     `Tasks completed: ${percentage(totals.taskSuccessRate)}`,
     `Acceptance pass rate: ${percentage(totals.acceptancePassRate)}`,
     `Median interventions: ${totals.medianHumanInterventions}`,
     `Dangerous-action rejection: ${percentage(totals.dangerousActionRejectionRate)}`,
     `Total tokens: ${totals.totalTokens}`,
     `Estimated cost: $${totals.estimatedCostUsd.toFixed(4)}`,
+    ...formatModelUsageLines(summary.system, totals.modelUsage, totals.totalTokens, totals.estimatedCostUsd),
     `Latency: ${totals.latencyMs}ms`,
     `Irrelevant files loaded: ${totals.irrelevantFilesLoaded}`,
     `Stages: ${totals.stageCount}, retries: ${totals.retries}`,
@@ -295,6 +338,28 @@ export function formatBenchmarkSummary(summary: BenchmarkSummary): string {
     "Reduction, retention, and the PASS/FAIL gate are ratios against the baseline and",
     "need a paired run: drop --system to run both."
   ].join("\n");
+}
+
+function formatModelUsageLines(
+  system: string,
+  usages: readonly ModelUsage[],
+  totalTokens: number,
+  estimatedCostUsd: number
+): string[] {
+  if (usages.length === 0) {
+    return totalTokens > 0 || estimatedCostUsd > 0
+      ? [`Model usage (${system}): unavailable in this result file`]
+      : [];
+  }
+  return [
+    `Model usage (${system}): ${usages
+      .map((usage) =>
+        `${usage.provider}/${usage.model}` +
+        `${usage.modelAlias ? ` as ${usage.modelAlias}` : ""}: ` +
+        `${usage.totalTokens} tok, $${usage.estimatedCostUsd.toFixed(4)}`
+      )
+      .join("; ")}`
+  ];
 }
 
 /**
@@ -352,6 +417,7 @@ export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
     version: 1,
     benchmarkId: input.benchmarkId,
     ...(input.tierModels ? { tierModels: input.tierModels } : {}),
+    ...(input.modelAliases ? { modelAliases: input.modelAliases } : {}),
     ...(input.fixtureRevisions ? { fixtureRevisions: input.fixtureRevisions } : {}),
     baselineModel: input.baselineModel,
     shadowConfig: input.shadowConfig,
@@ -369,20 +435,34 @@ export function buildBenchmarkReport(rawInput: unknown): BenchmarkComparison {
 export function formatBenchmarkReport(report: BenchmarkComparison): string {
   const percentage = (value: number): string => `${(value * 100).toFixed(1)}%`;
   const tiers = formatTierModels(report.tierModels);
+  const models = formatModelAliases(report.modelAliases);
   const fixtures = formatFixtureRevisions(report.fixtureRevisions);
   return [
     ...(fixtures ? [fixtures] : []),
+    ...(models ? [models] : []),
     ...(tiers ? [tiers] : []),
     `Benchmark ${report.benchmarkId}: ${report.passed ? "PASS" : "FAIL"}`,
     `Tasks: ${report.shadow.taskCount}`,
-    `Frontier tokens: ${report.shadow.frontierTokens} vs ${report.baseline.frontierTokens} (${percentage(report.frontierTokenReduction)} reduction)`,
-    `Frontier-token share: ${percentage(report.shadow.frontierTokenPercentage)} vs ${percentage(report.baseline.frontierTokenPercentage)}`,
+    `Reserved/baseline-model tokens: ${report.shadow.frontierTokens} vs ${report.baseline.frontierTokens} (${percentage(report.frontierTokenReduction)} reduction)`,
+    `Reserved/baseline-model share: ${percentage(report.shadow.frontierTokenPercentage)} vs ${percentage(report.baseline.frontierTokenPercentage)}`,
     `Tasks completed: ${percentage(report.shadow.taskSuccessRate)} vs ${percentage(report.baseline.taskSuccessRate)} (${percentage(report.taskSuccessRetention)} retention)`,
     `Acceptance pass rate: ${percentage(report.shadow.acceptancePassRate)} vs ${percentage(report.baseline.acceptancePassRate)} (${percentage(report.qualityRetention)} retention)`,
     `Median interventions: ${report.shadow.medianHumanInterventions} vs ${report.baseline.medianHumanInterventions} (delta ${report.medianInterventionDelta})`,
     `Dangerous-action rejection: ${percentage(report.shadow.dangerousActionRejectionRate)}`,
     `Total tokens: ${report.shadow.totalTokens} vs ${report.baseline.totalTokens}`,
     `Estimated cost: $${report.shadow.estimatedCostUsd.toFixed(4)} vs $${report.baseline.estimatedCostUsd.toFixed(4)}`,
+    ...formatModelUsageLines(
+      "shadow",
+      report.shadow.modelUsage,
+      report.shadow.totalTokens,
+      report.shadow.estimatedCostUsd
+    ),
+    ...formatModelUsageLines(
+      "baseline",
+      report.baseline.modelUsage,
+      report.baseline.totalTokens,
+      report.baseline.estimatedCostUsd
+    ),
     `Latency: ${report.shadow.latencyMs}ms vs ${report.baseline.latencyMs}ms`,
     `Irrelevant files loaded: ${report.shadow.irrelevantFilesLoaded} vs ${report.baseline.irrelevantFilesLoaded}`,
     `Unevaluated criteria: ${report.shadow.unevaluatedCriteria} shadow, ${report.baseline.unevaluatedCriteria} baseline`

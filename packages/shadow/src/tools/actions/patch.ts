@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ActionDefinition, ActionHandlerContext, ProcessResult } from "../types.js";
 import {
   ApplyPatchEnvelopeError,
+  looksLikeApplyPatchFragment,
   looksLikeApplyPatchEnvelope,
   translateApplyPatchEnvelope
 } from "./apply-patch-envelope.js";
@@ -111,31 +112,6 @@ async function checkPatch(
   rawPatch: string,
   context: ActionHandlerContext
 ): Promise<PatchCheck> {
-  let patch = rawPatch;
-  let translated = false;
-  // Frontier models emit OpenAI's `*** Begin Patch` envelope in place of a unified diff
-  // often enough to lose whole tasks on format alone. Translating before Git sees it
-  // keeps every downstream guard — deletion, symlink, binary, scope — working on a diff.
-  if (looksLikeApplyPatchEnvelope(rawPatch)) {
-    try {
-      // Git resolves patch paths against the cwd it runs in, so translation must read
-      // the same files Git will write. The runner has already bounded cwd to the workspace.
-      patch = (await translateApplyPatchEnvelope(rawPatch, context.cwd)).patch;
-      translated = true;
-    } catch (error) {
-      if (!(error instanceof ApplyPatchEnvelopeError)) {
-        throw error;
-      }
-      return {
-        check: syntheticFailure(["apply-patch-envelope"], `${error.message}\n`),
-        changedFiles: [],
-        createdFiles: [],
-        recounted: false,
-        translated: false,
-        effectivePatch: rawPatch
-      };
-    }
-  }
   const checkCommand = (args: string[]): string[] => [
     "git",
     "apply",
@@ -144,60 +120,104 @@ async function checkPatch(
     "--whitespace=error-all",
     "-"
   ];
-  const strict = await context.execute(checkCommand([]), { stdin: patch });
-  let check = strict;
-  let recounted = false;
-  if (failed(strict)) {
-    const retried = await context.execute(checkCommand(["--recount"]), { stdin: patch });
-    if (failed(retried)) {
-      // Report the strict diagnostics: they describe the patch as the model wrote it.
+
+  const envelopeFailure = (error: ApplyPatchEnvelopeError): PatchCheck => ({
+    check: syntheticFailure(["apply-patch-envelope"], `${error.message}\n`),
+    changedFiles: [],
+    createdFiles: [],
+    recounted: false,
+    translated: false,
+    effectivePatch: rawPatch
+  });
+
+  const translateEnvelope = async (): Promise<string | PatchCheck> => {
+    try {
+      // Git resolves patch paths against the cwd it runs in, so translation must read
+      // the same files Git will write. The runner has already bounded cwd to the workspace.
+      return (await translateApplyPatchEnvelope(rawPatch, context.cwd)).patch;
+    } catch (error) {
+      if (!(error instanceof ApplyPatchEnvelopeError)) {
+        throw error;
+      }
+      return envelopeFailure(error);
+    }
+  };
+
+  const runGitChecks = async (patch: string, translated: boolean): Promise<PatchCheck> => {
+    const strict = await context.execute(checkCommand([]), { stdin: patch });
+    let check = strict;
+    let recounted = false;
+    if (failed(strict)) {
+      const retried = await context.execute(checkCommand(["--recount"]), { stdin: patch });
+      if (failed(retried)) {
+        // Report the strict diagnostics: they describe the patch as the model wrote it.
+        return {
+          check: strict,
+          changedFiles: [],
+          createdFiles: [],
+          recounted: false,
+          translated,
+          effectivePatch: patch
+        };
+      }
+      check = retried;
+      recounted = true;
+    }
+    const args = recountArgs(recounted);
+    const numstatCommand = ["git", "apply", "--numstat", "-z", ...args, "-"];
+    const numstat = await context.execute(numstatCommand, { stdin: patch });
+    const changedFiles = failed(numstat) ? [] : parseNumstat(numstat.stdout);
+    if (!safeChangedFiles(changedFiles)) {
+      throw new Error("Patch contains a path outside the workspace.");
+    }
+    const summaryCommand = ["git", "apply", "--summary", ...args, "-"];
+    const summary = await context.execute(summaryCommand, { stdin: patch });
+    const forbiddenChange = destructivePattern.test(
+      `${summary.stdout}\n${summary.stderr}\n${patch.includes("GIT binary patch") ? "binary patch" : ""}`
+    );
+    if (forbiddenChange) {
       return {
-        check: strict,
-        changedFiles: [],
+        check: { ...check, exitCode: 1, stderr: destructiveChangeRefusal },
+        numstat,
+        changedFiles,
         createdFiles: [],
-        recounted: false,
+        recounted,
         translated,
         effectivePatch: patch
       };
     }
-    check = retried;
-    recounted = true;
-  }
-  const args = recountArgs(recounted);
-  const numstatCommand = ["git", "apply", "--numstat", "-z", ...args, "-"];
-  const numstat = await context.execute(numstatCommand, { stdin: patch });
-  const changedFiles = failed(numstat) ? [] : parseNumstat(numstat.stdout);
-  if (!safeChangedFiles(changedFiles)) {
-    throw new Error("Patch contains a path outside the workspace.");
-  }
-  const summaryCommand = ["git", "apply", "--summary", ...args, "-"];
-  const summary = await context.execute(summaryCommand, { stdin: patch });
-  const forbiddenChange = destructivePattern.test(
-    `${summary.stdout}\n${summary.stderr}\n${patch.includes("GIT binary patch") ? "binary patch" : ""}`
-  );
-  if (forbiddenChange) {
+    if (failed(summary)) {
+      return { check: summary, numstat, changedFiles, createdFiles: [], recounted, translated, effectivePatch: patch };
+    }
     return {
-      check: { ...check, exitCode: 1, stderr: destructiveChangeRefusal },
+      check,
       numstat,
       changedFiles,
-      createdFiles: [],
+      createdFiles: parseCreatedFiles(summary.stdout),
       recounted,
       translated,
       effectivePatch: patch
     };
-  }
-  if (failed(summary)) {
-    return { check: summary, numstat, changedFiles, createdFiles: [], recounted, translated, effectivePatch: patch };
-  }
-  return {
-    check,
-    numstat,
-    changedFiles,
-    createdFiles: parseCreatedFiles(summary.stdout),
-    recounted,
-    translated,
-    effectivePatch: patch
   };
+
+  // Frontier models emit OpenAI's `*** Begin Patch` envelope in place of a unified diff
+  // often enough to lose whole tasks on format alone. Translating before Git sees it
+  // keeps every downstream guard — deletion, symlink, binary, scope — working on a diff.
+  if (looksLikeApplyPatchEnvelope(rawPatch)) {
+    const translated = await translateEnvelope();
+    return typeof translated === "string" ? runGitChecks(translated, true) : translated;
+  }
+
+  const checked = await runGitChecks(rawPatch, false);
+  if (
+    failed(checked.check) &&
+    checked.numstat === undefined &&
+    looksLikeApplyPatchFragment(rawPatch)
+  ) {
+    const translated = await translateEnvelope();
+    return typeof translated === "string" ? runGitChecks(translated, true) : translated;
+  }
+  return checked;
 }
 
 /** Describes any repair the actions had to perform, for the caller-visible summary. */

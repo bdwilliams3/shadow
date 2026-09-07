@@ -10,7 +10,7 @@ const noUsage: UsageTotals = { inputTokens: 0, outputTokens: 0, estimatedCostUsd
 
 function callOptions() {
   return {
-    tier: "balanced" as const,
+    tier: defaultConfig.agents.develop,
     system: "Return JSON.",
     input: { question: "hello" },
     schemaName: "fixture_result_v1",
@@ -34,7 +34,7 @@ describe("ModelRouter", () => {
         };
       }
     };
-    const router = new ModelRouter(defaultConfig, new Map([["default", provider]]));
+    const router = new ModelRouter(defaultConfig, new Map([["anthropic", provider], ["google", provider], ["openai", provider]]));
 
     const result = await router.completeStructured(callOptions());
 
@@ -46,7 +46,7 @@ describe("ModelRouter", () => {
 
   it("blocks an over-budget call before invoking the provider", async () => {
     const complete = vi.fn<ModelProvider["complete"]>();
-    const router = new ModelRouter(defaultConfig, new Map([["default", { complete }]]), {
+    const router = new ModelRouter(defaultConfig, new Map([["anthropic", { complete }], ["google", { complete }], ["openai", { complete }]]), {
       estimate: () => 30_000
     });
 
@@ -62,7 +62,7 @@ describe("ModelRouter", () => {
         return { text: "```json\n{\"answer\":\"world\"}\n```", usage: noUsage };
       }
     };
-    const router = new ModelRouter(defaultConfig, new Map([["default", provider]]));
+    const router = new ModelRouter(defaultConfig, new Map([["anthropic", provider], ["google", provider], ["openai", provider]]));
 
     await expect(router.completeStructured(callOptions())).rejects.toSatisfy(
       (error: unknown) => error instanceof ModelRoutingError && error.record.status === "failed"
@@ -73,7 +73,7 @@ describe("ModelRouter", () => {
     const config = structuredClone(defaultConfig);
     config.approvals.requireApprovalForNetwork = true;
     const complete = vi.fn<ModelProvider["complete"]>();
-    const router = new ModelRouter(config, new Map([["default", { complete }]]));
+    const router = new ModelRouter(config, new Map([["anthropic", { complete }], ["google", { complete }], ["openai", { complete }]]));
 
     await expect(router.completeStructured(callOptions())).rejects.toSatisfy(
       (error: unknown) =>

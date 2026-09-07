@@ -1,4 +1,6 @@
 import type { ShadowConfig } from "../config/schema.js";
+import { AnthropicProvider } from "./anthropic.js";
+import { GoogleProvider } from "./google.js";
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import type { ModelProvider } from "./provider.js";
 
@@ -23,6 +25,29 @@ export function createConfiguredProviders(
     const apiKey = environmentName ? environment[environmentName] : undefined;
     if (!apiKey) {
       diagnostics.push(`Provider ${id} is unavailable because ${environmentName ?? "an API key"} is not set.`);
+      continue;
+    }
+    if (providerConfig.kind === "anthropic") {
+      providers.set(
+        id,
+        new AnthropicProvider({
+          baseUrl: providerConfig.baseUrl ?? "https://api.anthropic.com/v1",
+          apiKey,
+          requestTimeoutMs: providerConfig.requestTimeoutMs
+        })
+      );
+      continue;
+    }
+    if (providerConfig.kind === "google") {
+      providers.set(
+        id,
+        new GoogleProvider({
+          baseUrl: providerConfig.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta",
+          apiKey,
+          structuredOutput: providerConfig.structuredOutput,
+          requestTimeoutMs: providerConfig.requestTimeoutMs
+        })
+      );
       continue;
     }
     providers.set(

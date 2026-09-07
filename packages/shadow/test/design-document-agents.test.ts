@@ -89,7 +89,7 @@ describe("Design and Document agents", () => {
     };
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const run = await new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]]),
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]]),
       testsExecutor: {
         async runTests() {
           return TestRunSummarySchema.parse({

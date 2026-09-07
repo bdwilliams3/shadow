@@ -13,6 +13,7 @@ import { isAbsolute, resolve, sep } from "node:path";
 const beginMarker = "*** Begin Patch";
 const endMarker = "*** End Patch";
 const noNewlineMarker = "\\ No newline at end of file";
+const fileHeaderPattern = /^\*\*\* (Update File|Add File|Delete File|Move to|End of File):?[ \t]*(.*)$/;
 
 interface HunkLine {
   tag: " " | "-" | "+";
@@ -46,6 +47,11 @@ export function looksLikeApplyPatchEnvelope(patch: string): boolean {
   return /^\s*\*\*\* Begin Patch[ \t]*$/m.test(patch);
 }
 
+export function looksLikeApplyPatchFragment(patch: string): boolean {
+  return !looksLikeApplyPatchEnvelope(patch) &&
+    /^\s*\*\*\* (?:Update File|Add File|Delete File|Move to):?[ \t]+\S/m.test(patch);
+}
+
 function assertWorkspacePath(path: string): void {
   if (!path || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
     throw new ApplyPatchEnvelopeError(`Envelope names a path outside the workspace: ${path}`);
@@ -54,13 +60,20 @@ function assertWorkspacePath(path: string): void {
 
 function parseEnvelope(patch: string): Operation[] {
   const all = patch.split("\n");
-  const begin = all.findIndex((line) => line.trim() === beginMarker);
+  const firstHeader = all.findIndex((line) => fileHeaderPattern.test(line.trim()));
+  let begin = all.findIndex((line) => line.trim() === beginMarker);
   if (begin === -1) {
-    throw new ApplyPatchEnvelopeError("Envelope has no *** Begin Patch line.");
+    if (firstHeader === -1) {
+      throw new ApplyPatchEnvelopeError("Envelope has no *** Begin Patch line.");
+    }
+    begin = firstHeader - 1;
   }
-  const end = all.findIndex((line, index) => index > begin && line.trim() === endMarker);
+  let end = all.findIndex((line, index) => index > begin && line.trim() === endMarker);
   if (end === -1) {
-    throw new ApplyPatchEnvelopeError("Envelope has no *** End Patch line.");
+    if (firstHeader === -1) {
+      throw new ApplyPatchEnvelopeError("Envelope has no *** End Patch line.");
+    }
+    end = all.length;
   }
 
   const operations: Operation[] = [];
@@ -79,9 +92,7 @@ function parseEnvelope(patch: string): Operation[] {
 
   for (let index = begin + 1; index < end; index += 1) {
     const line = all[index] ?? "";
-    const header = /^\*\*\* (Update File|Add File|Delete File|Move to|End of File):?[ \t]*(.*)$/.exec(
-      line.trim()
-    );
+    const header = fileHeaderPattern.exec(line.trim());
     if (header) {
       const [, keyword, rest] = header;
       const path = (rest ?? "").trim();
@@ -272,12 +283,32 @@ function updateDiff(
   fileLines: string[],
   trailingNewline: boolean
 ): string[] {
-  const placed: PlacedHunk[] = [];
+  let placed: PlacedHunk[];
   let cursor = 0;
-  for (const hunk of hunks) {
-    const start = locateHunk(fileLines, hunk, cursor, path);
-    placed.push({ start, lines: hunk.lines });
-    cursor = start + oldLength(hunk.lines);
+  try {
+    placed = hunks.map((hunk) => {
+      const start = locateHunk(fileLines, hunk, cursor, path);
+      cursor = start + oldLength(hunk.lines);
+      return { start, lines: hunk.lines };
+    });
+  } catch (orderedError) {
+    try {
+      placed = hunks.map((hunk) => ({
+        start: locateHunk(fileLines, hunk, 0, path),
+        lines: hunk.lines
+      }));
+    } catch {
+      throw orderedError;
+    }
+  }
+  placed.sort((left, right) => left.start - right.start);
+
+  for (let index = 1; index < placed.length; index += 1) {
+    const previous = placed[index - 1] as PlacedHunk;
+    const current = placed[index] as PlacedHunk;
+    if (current.start < previous.start + oldLength(previous.lines)) {
+      throw new ApplyPatchEnvelopeError(`Hunks for ${path} overlap after ordering.`);
+    }
   }
 
   // Hunks closer together than twice the radius would pad into each other and overlap,

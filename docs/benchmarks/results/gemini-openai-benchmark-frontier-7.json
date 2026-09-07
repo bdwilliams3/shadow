@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "openai/gpt-5.6-luna",
+  "shadowConfig": "plan=gpt-5.6-luna,design=gpt-5.5,develop=gpt-5.5,test=gemini-2-5-flash,validate=gemini-3-1-pro-preview,deploy=gpt-5.5,document=gemini-2-5-flash",
+  "workRoot": "/tmp/shadow-bench-clean-frontier",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline",
+      "status": "failed",
+      "summary": "Hunk for core/connectors/cloudflare.py does not match the file content.\n",
+      "changedFiles": [],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "cc531f14-f4bf-413e-bc42-25c083c4aa15",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/32/3216de6d2217bcbdeba9bb8dd8c93c631b0cd56ec4dd41e74ecc1456bfcc2a49-baseline.patch",
+          "sha256": "3216de6d2217bcbdeba9bb8dd8c93c631b0cd56ec4dd41e74ecc1456bfcc2a49",
+          "bytes": 3212
+        },
+        {
+          "id": "38c7c031-53b6-4374-84dd-aa917dc337c0",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/5e/5ecbc014ebccfb0586e3818632fb234b765f0ce44fb2492e04047120c9638f54-patch.check.stderr.log",
+          "sha256": "5ecbc014ebccfb0586e3818632fb234b765f0ce44fb2492e04047120c9638f54",
+          "bytes": 72
+        },
+        {
+          "id": "2a7f2451-967c-4fc3-a5f0-ab02e8bca9b6",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/b1/b1c13cc06e1a9cf997ebf4917f0cd57a4b9b621ff3a8dc7fb85fdbd4021640b9-patch.check.result.json",
+          "sha256": "b1c13cc06e1a9cf997ebf4917f0cd57a4b9b621ff3a8dc7fb85fdbd4021640b9",
+          "bytes": 179
+        },
+        {
+          "id": "597bd5df-22f3-4d86-a886-e1126432a8ef",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/fb/fb291ecc4e5fc0767a45303fe3275fe750de42f22b72e61017b47b824b287159-baseline.repair-1.patch",
+          "sha256": "fb291ecc4e5fc0767a45303fe3275fe750de42f22b72e61017b47b824b287159",
+          "bytes": 4910
+        },
+        {
+          "id": "5e9e3c75-0037-4fd4-8019-bcecd949c0e5",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/40/40f7e79eea181a1abee9092259a3667e97c79a9b1278057453a8ac0ecce8600a-patch.check.stderr.log",
+          "sha256": "40f7e79eea181a1abee9092259a3667e97c79a9b1278057453a8ac0ecce8600a",
+          "bytes": 72
+        },
+        {
+          "id": "dd7c3e28-51fe-444f-916f-dbd48e4d9f84",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/8a/8a4cd5721674eb631fafa4bbb68b406df1e5ff6b47e34c259324ce8b1e7a5a79-patch.check.result.json",
+          "sha256": "8a4cd5721674eb631fafa4bbb68b406df1e5ff6b47e34c259324ce8b1e7a5a79",
+          "bytes": 179
+        }
+      ]
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow",
+      "status": "COMPLETED",
+      "summary": "plan: Planned develop, test, validate. | develop: Applied patch affecting 1 files. Repaired: malformed hunk line counts recounted. | test: No test command is configured. | validate: Validation inspected 1 changed files; No typecheck command is configured. Secret scan inspected 29 files with no findings. No package.json dependency manifests were found.",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "e84d8b9f-415b-46e5-8313-f70a048c8e08",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "634270a5-1d45-4b5e-98f9-a2ee80788efd",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "bbbab639-0429-4833-98d2-8e1eb2aaa63e",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "33915195-7b35-41c7-ae4d-7bfdf617de1f",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "a33a5948-785a-471f-83f8-c198f496cb1f",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/20/204c61d551f36500b46482f57a72a79415477abd5fb4d449cd1fb1141cb7c9a9-plan.result.json",
+          "sha256": "204c61d551f36500b46482f57a72a79415477abd5fb4d449cd1fb1141cb7c9a9",
+          "bytes": 1173
+        },
+        {
+          "id": "9dbfc664-67ff-4121-93dd-9c43f0235e46",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/0c/0c0e861786ee3f735c9f203d6002376bedb60478668c7242c9ec5a246572ebf9-context.select.stdout.log",
+          "sha256": "0c0e861786ee3f735c9f203d6002376bedb60478668c7242c9ec5a246572ebf9",
+          "bytes": 1184
+        },
+        {
+          "id": "2d974bf1-65de-40e0-b616-6d92e0a2c922",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72-context.select.result.json",
+          "sha256": "997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72",
+          "bytes": 6801
+        },
+        {
+          "id": "a0cedcb5-dde9-4d94-b683-e4953e1dd960",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/6f/6f26697bbd7f45e9f14c0118507e4186ba0cbd3524b44bc683add6619cd568ed-git.status.stdout.log",
+          "sha256": "6f26697bbd7f45e9f14c0118507e4186ba0cbd3524b44bc683add6619cd568ed",
+          "bytes": 849
+        },
+        {
+          "id": "1aaddff4-8bf0-44ab-af3c-1564cf31e617",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/72/72ff7f2a8ee1b6ef3e6588eee804be7cfd5e36b3fb25cce33045af82b953ba29-develop.patch",
+          "sha256": "72ff7f2a8ee1b6ef3e6588eee804be7cfd5e36b3fb25cce33045af82b953ba29",
+          "bytes": 2260
+        },
+        {
+          "id": "778737e3-ce6c-4c03-ac6e-e53ea6f9ea4f",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/f6/f60d4e135526b0e7975ca9cfe5f04ed72ff136da7fd42f4cd417d09b6e77b1e2-patch.check.stdout.log",
+          "sha256": "f60d4e135526b0e7975ca9cfe5f04ed72ff136da7fd42f4cd417d09b6e77b1e2",
+          "bytes": 20
+        },
+        {
+          "id": "7468f574-4b7d-4c58-adff-bd8c2cc67435",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "dd2daec7-34f3-4f7d-b1d4-1a137ce3b65d",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "4378378c-a0fb-4974-a965-181fd8ae00d5",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        },
+        {
+          "id": "53022817-3429-452c-8500-a2046cbff3cd",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/fc/fcc24965df2a63fd5500041370a4d65cc1861f83e37b4245047ee7fa6df0ea2f-git.status.stdout.log",
+          "sha256": "fcc24965df2a63fd5500041370a4d65cc1861f83e37b4245047ee7fa6df0ea2f",
+          "bytes": 1535
+        },
+        {
+          "id": "32165067-d5ca-4baa-ae13-d7eae2bb0879",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/43/43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464-git.status.result.json",
+          "sha256": "43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464",
+          "bytes": 174
+        },
+        {
+          "id": "75f6507f-22eb-47fc-98c5-0505bc3a468a",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/0e/0e21b5b5206c3a4093bfb301f7e608c2fdaa06bc6d4a2db98b53a601f33ca226-tests.select.stdout.log",
+          "sha256": "0e21b5b5206c3a4093bfb301f7e608c2fdaa06bc6d4a2db98b53a601f33ca226",
+          "bytes": 2276
+        },
+        {
+          "id": "7a5ca945-e4fa-49fa-b812-9a60ae6fb2c1",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/24/24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7-tests.select.result.json",
+          "sha256": "24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7",
+          "bytes": 170
+        },
+        {
+          "id": "57182911-82c0-440d-80fa-b81c033f6da2",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/1b/1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87-quality.test.result.json",
+          "sha256": "1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87",
+          "bytes": 52
+        },
+        {
+          "id": "21503da5-14dc-4a51-9d0c-6701185447a2",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d0/d046af87f08794ed3d30f1400aff7dcb5f3242f6ef8ad9641086a045148c13c8-git.status.stdout.log",
+          "sha256": "d046af87f08794ed3d30f1400aff7dcb5f3242f6ef8ad9641086a045148c13c8",
+          "bytes": 2348
+        },
+        {
+          "id": "ee9d9f50-f7b9-4159-8287-cb55b0fb4815",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/58/581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee-quality.typecheck.result.json",
+          "sha256": "581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee",
+          "bytes": 57
+        },
+        {
+          "id": "75e19978-a189-45b6-afdf-48a58b155cb4",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d4/d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492-security.secrets.result.json",
+          "sha256": "d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492",
+          "bytes": 138
+        },
+        {
+          "id": "d34daf6a-c945-4057-b1d7-99b22fad8b92",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3e/3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878-security.dependencies.result.json",
+          "sha256": "3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878",
+          "bytes": 127
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "modelAliases": {
+    "fable-5-1": "anthropic/fable-5.1 [reserved]",
+    "gemini-2-5": "google/gemini-2.5",
+    "gemini-2-5-flash": "google/gemini-2.5-flash",
+    "gemini-3-1-flash-lite": "google/gemini-3.1-flash-lite",
+    "gemini-3-1-pro-preview": "google/gemini-3.1-pro-preview [reserved]",
+    "gemini-3-5-flash": "google/gemini-3.5-flash",
+    "gemini-3-8": "google/gemini-3.8 [reserved]",
+    "gemini-3-8-flash": "google/gemini-3.8-flash [reserved]",
+    "gpt-5-4-mini": "openai/gpt-5.4-mini",
+    "gpt-5-5": "openai/gpt-5.5",
+    "gpt-5-6-luna": "openai/gpt-5.6-luna",
+    "gpt-5-6-sol": "openai/gpt-5.6-sol [reserved]",
+    "gpt-6-astra": "openai/gpt-6-astra [reserved]",
+    "haiku-4-5": "anthropic/haiku-4.5",
+    "opus-4-8": "anthropic/opus-4.8 [reserved]",
+    "sonnet-4-6": "anthropic/sonnet-4.6"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 52684,
+      "totalTokens": 52684,
+      "estimatedCostUsd": 0.0139608,
+      "latencyMs": 42210,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 1,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 0,
+      "totalTokens": 4578,
+      "estimatedCostUsd": 0.0207142,
+      "latencyMs": 18631,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

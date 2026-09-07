@@ -1,14 +1,13 @@
-import type { ShadowConfig } from "../config/schema.js";
-import type { CapabilityTier } from "../orchestration/types.js";
+import { listModelAliases, resolveModelAlias, type ShadowConfig } from "../config/schema.js";
 import { createConfiguredProviders } from "./factory.js";
 import type { ModelProvider } from "./provider.js";
 
 /**
- * Sends one minimal request per distinct tier model, through the same transport the
+ * Sends one minimal request per distinct configured model, through the same transport the
  * agents use. A model id can be perfectly valid and still be unreachable — served on a
  * different endpoint, or not enabled for the key — and the only faithful way to find out
- * is to call it. Without this, a wrong tier entry surfaces as a failed benchmark run
- * several minutes and several tasks later.
+ * is to call it. Without this, a wrong alias surfaces as a failed run several minutes
+ * and several stages later.
  */
 export async function probeModels(
   config: ShadowConfig,
@@ -23,18 +22,20 @@ export async function probeModels(
     }
     providers = configured.providers;
   }
+  const agentAliases = new Set(Object.values(config.agents));
   const seen = new Map<string, string[]>();
-  for (const tier of ["frontier", "balanced", "economy"] as const) {
-    const alias = config.models[tier];
+  for (const alias of listModelAliases(config).filter((candidate) => agentAliases.has(candidate.alias))) {
     const key = `${alias.provider}/${alias.model}`;
-    seen.set(key, [...(seen.get(key) ?? []), tier]);
+    seen.set(key, [...(seen.get(key) ?? []), alias.alias]);
   }
 
   let allReachable = true;
-  for (const [key, tiers] of seen) {
+  for (const [key, aliases] of seen) {
+    const firstAlias = aliases[0];
+    if (!firstAlias) continue;
     const [providerId = "", model = ""] = [key.slice(0, key.indexOf("/")), key.slice(key.indexOf("/") + 1)];
     const provider = providers.get(providerId);
-    const label = `${tiers.join(", ")} -> ${key}`;
+    const label = `${aliases.join(", ")} -> ${key}`;
     if (!provider) {
       log(`${label}: provider not configured`);
       allReachable = false;
@@ -42,7 +43,7 @@ export async function probeModels(
     }
     try {
       await provider.complete({
-        tier: tiers[0] as CapabilityTier,
+        tier: resolveModelAlias(config, firstAlias)?.alias ?? firstAlias,
         model,
         system: "Reply with {\"ok\":\"ok\"}.",
         input: {},
@@ -65,4 +66,3 @@ export async function probeModels(
   }
   return allReachable;
 }
-

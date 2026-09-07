@@ -62,7 +62,7 @@ function providerReturning(patch: string): ModelProvider {
 async function runDevelop(workspace: string, provider: ModelProvider) {
   const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
   const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
-    providers: new Map([["default", withPlanStage(provider)]])
+    providers: new Map([["anthropic", withPlanStage(provider)], ["google", withPlanStage(provider)], ["openai", withPlanStage(provider)]])
   });
   const run = await orchestrator.run({
     request: "change hello.txt and add a notes file",

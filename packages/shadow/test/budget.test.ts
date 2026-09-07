@@ -18,7 +18,7 @@ describe("checkBudget", () => {
       budget,
       none,
       { inputTokens: 10, outputTokens: 5, estimatedCostUsd: 0.1 },
-      "balanced"
+      false
     );
 
     expect(result.allowed).toBe(true);
@@ -30,7 +30,7 @@ describe("checkBudget", () => {
       budget,
       none,
       { inputTokens: 110, outputTokens: 5, estimatedCostUsd: 0.1 },
-      "balanced"
+      false
     );
 
     expect(result.allowed).toBe(false);
@@ -42,7 +42,7 @@ describe("checkBudget", () => {
       budget,
       none,
       { inputTokens: 90, outputTokens: 15, estimatedCostUsd: 0.1 },
-      "balanced"
+      false
     );
 
     expect(result.allowed).toBe(false);
@@ -54,7 +54,7 @@ describe("checkBudget", () => {
       budget,
       none,
       { inputTokens: 90, outputTokens: 15, estimatedCostUsd: 0.1 },
-      "frontier"
+      true
     );
 
     expect(result.allowed).toBe(true);

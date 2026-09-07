@@ -1,7 +1,7 @@
-import type { CapabilityTier, UsageTotals } from "../orchestration/types.js";
+import type { ModelAlias, UsageTotals } from "../orchestration/types.js";
 
 export interface ModelRequest {
-  tier: CapabilityTier;
+  tier: ModelAlias;
   model: string;
   system: string;
   input: unknown;

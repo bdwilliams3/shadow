@@ -55,6 +55,8 @@ const sharedConstraints = [
   "Persist structured stage results and audit events."
 ];
 
+const criteriaConsumingStages = new Set<StageName>(["design", "develop", "document"]);
+
 export interface StageTaskInput {
   runId: string;
   stage: StageName;
@@ -95,7 +97,8 @@ export function planWorkflow(
   request: string,
   config: ShadowConfig,
   dryRun: boolean,
-  allowedChangedFiles?: string[]
+  allowedChangedFiles?: string[],
+  acceptanceCriteria?: string[]
 ): PlannedWorkflow {
   const normalized = request.toLowerCase();
   const deployRequested = /\b(deploy|release|publish)\b/.test(normalized);
@@ -134,6 +137,9 @@ export function planWorkflow(
         goal: request,
         budget: config.budgets.stage,
         dryRun,
+        ...(acceptanceCriteria !== undefined && criteriaConsumingStages.has(stage)
+          ? { acceptanceCriteria }
+          : {}),
         ...(allowedChangedFiles !== undefined ? { allowedChangedFiles } : {})
       })
     ),

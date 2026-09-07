@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "openai/gpt-5.6-luna",
+  "shadowConfig": "plan=gpt-5.5,design=gpt-5.6-luna,develop=gpt-5.6-luna,test=gemini-2-5-flash,validate=gemini-3-1-pro-preview,deploy=gpt-5.6-luna,document=gemini-2-5-flash",
+  "workRoot": "/tmp/shadow-bench-clean-frontier",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline",
+      "status": "completed",
+      "summary": "Added a configurable finite request timeout to provider connector credentials, defaulting to 30 seconds.",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "60f5cfd6-104f-43a5-b2b8-d6c4e5b7b6bc",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/86/8683128f0215498268d094d8af5d960812e03a1338e4828c5d11cc660a05478e-baseline.patch",
+          "sha256": "8683128f0215498268d094d8af5d960812e03a1338e4828c5d11cc660a05478e",
+          "bytes": 1523
+        },
+        {
+          "id": "66aa703c-dfcf-43a5-89cc-c57a658d150c",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/5e/5ecbc014ebccfb0586e3818632fb234b765f0ce44fb2492e04047120c9638f54-patch.check.stderr.log",
+          "sha256": "5ecbc014ebccfb0586e3818632fb234b765f0ce44fb2492e04047120c9638f54",
+          "bytes": 72
+        },
+        {
+          "id": "40656210-1f39-40c4-81e7-e77404181f79",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/b1/b1c13cc06e1a9cf997ebf4917f0cd57a4b9b621ff3a8dc7fb85fdbd4021640b9-patch.check.result.json",
+          "sha256": "b1c13cc06e1a9cf997ebf4917f0cd57a4b9b621ff3a8dc7fb85fdbd4021640b9",
+          "bytes": 179
+        },
+        {
+          "id": "c5a8121b-4059-4c19-8fb7-5fba8d53a473",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/84/84204d817b3a7215cad3f8c475367d00263aea7a2ccbcc05dc383f36e5c87a0b-baseline.repair-1.patch",
+          "sha256": "84204d817b3a7215cad3f8c475367d00263aea7a2ccbcc05dc383f36e5c87a0b",
+          "bytes": 2020
+        },
+        {
+          "id": "a0337806-7975-4a87-9f9d-8a7a7c5141a9",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/84/8465023ad59f73509f7acebab5b5bcf79e01bd3b406915500af73db35c03095c-patch.check.stdout.log",
+          "sha256": "8465023ad59f73509f7acebab5b5bcf79e01bd3b406915500af73db35c03095c",
+          "bytes": 20
+        },
+        {
+          "id": "b4ce5a75-e3e5-4f52-bbfe-b15aa2ba609c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "e575c142-24a6-4d0e-975d-49a522914d8c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        }
+      ]
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow",
+      "status": "FAILED",
+      "summary": "plan: Planned develop, test, validate. | develop: Patch validation failed.",
+      "changedFiles": [],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "03cb036d-cbb1-4eb1-988a-eee82f6f6dcd",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "e43497d9-d635-4ff4-906b-3689f9e805f2",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "0af33123-123b-4f1a-a90d-82b2c2b3b1e3",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "8239233e-aafc-4aa3-bc98-2a276eaaaa2e",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "178d8e11-45b4-4165-9eb8-d1063c114af3",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/9f/9f5f488fd4368628254ba5e6e66712e51d7765944dce56df6646a4c74e82d53a-plan.result.json",
+          "sha256": "9f5f488fd4368628254ba5e6e66712e51d7765944dce56df6646a4c74e82d53a",
+          "bytes": 1020
+        },
+        {
+          "id": "140e0646-3563-454b-b3c6-abbb6f9cb4fd",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/81/81076546987a5789dd432584617aa30cf54d853b9273603c574c3cbd5692e360-context.select.stdout.log",
+          "sha256": "81076546987a5789dd432584617aa30cf54d853b9273603c574c3cbd5692e360",
+          "bytes": 1184
+        },
+        {
+          "id": "46179c3a-5ea1-4433-9b8f-1362595a2c8f",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72-context.select.result.json",
+          "sha256": "997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72",
+          "bytes": 6801
+        },
+        {
+          "id": "7417a923-c9a6-4397-a2c5-054bad9c411a",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c4/c4db6652cf5335425df1e6c0b45e4bcd9fb6e8c468a6c6b1df97b22b858169be-git.status.stdout.log",
+          "sha256": "c4db6652cf5335425df1e6c0b45e4bcd9fb6e8c468a6c6b1df97b22b858169be",
+          "bytes": 849
+        },
+        {
+          "id": "f37f72f6-4d82-45d9-af89-35242372d907",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/99b508f563c846ef4038a23eea3272cfed1a78d1be50c77b51e74a9898b80c48-develop.patch",
+          "sha256": "99b508f563c846ef4038a23eea3272cfed1a78d1be50c77b51e74a9898b80c48",
+          "bytes": 1738
+        },
+        {
+          "id": "9d14673b-df99-4a23-b941-811ff74c2ddc",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/fe/fe3cf87c404e1fe83f6ba1d24ba00c40dcebcaaa831877019e5735ffa1efea2b-patch.check.stderr.log",
+          "sha256": "fe3cf87c404e1fe83f6ba1d24ba00c40dcebcaaa831877019e5735ffa1efea2b",
+          "bytes": 32
+        },
+        {
+          "id": "c5efe39c-e9bf-4c65-80fe-da06d67c2c6b",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/41/412a17a9d5e985953d8db8bf2be5c91f9dbfa8c7bbc75e91605bf5a8e49e8558-patch.check.result.json",
+          "sha256": "412a17a9d5e985953d8db8bf2be5c91f9dbfa8c7bbc75e91605bf5a8e49e8558",
+          "bytes": 139
+        },
+        {
+          "id": "78f41f89-cd5c-4dd7-b8d3-c7eb6336c280",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/49/49ed6a470770530622c8994150bce197340820217e2a965c99878b01674eaac3-context.select.stdout.log",
+          "sha256": "49ed6a470770530622c8994150bce197340820217e2a965c99878b01674eaac3",
+          "bytes": 1836
+        },
+        {
+          "id": "6b0d38af-0e4b-40b3-b153-34e518e330b4",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/f6/f635637ec1918f3e97094eee38d415b41e2495510688a0c14c0214610478c469-git.status.stdout.log",
+          "sha256": "f635637ec1918f3e97094eee38d415b41e2495510688a0c14c0214610478c469",
+          "bytes": 1403
+        },
+        {
+          "id": "1f6a6a5d-d51a-4aaa-b1ef-778a20ee8918",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ea/ea83d06f45c7ffbbae9353d9053968b4b4632c6f59297bb7870a23c12f552c56-develop.patch",
+          "sha256": "ea83d06f45c7ffbbae9353d9053968b4b4632c6f59297bb7870a23c12f552c56",
+          "bytes": 1951
+        },
+        {
+          "id": "7f5ab4ac-1f3f-4222-8d9d-ccfe4ef962ed",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/42/42f8e396187ba38a38df6622bd5109ecff3c86f6584f11e10725d104cd395f5d-patch.check.stderr.log",
+          "sha256": "42f8e396187ba38a38df6622bd5109ecff3c86f6584f11e10725d104cd395f5d",
+          "bytes": 32
+        },
+        {
+          "id": "de14296d-cd60-4466-873e-8d398d3ff6e9",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/eb/ebdba7e5ecf568a26490b5a23d4981c895f839731da10625999e2b17d2c6385c-patch.check.result.json",
+          "sha256": "ebdba7e5ecf568a26490b5a23d4981c895f839731da10625999e2b17d2c6385c",
+          "bytes": 139
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "modelAliases": {
+    "fable-5-1": "anthropic/fable-5.1 [reserved]",
+    "gemini-2-5": "google/gemini-2.5",
+    "gemini-2-5-flash": "google/gemini-2.5-flash",
+    "gemini-3-1-flash-lite": "google/gemini-3.1-flash-lite",
+    "gemini-3-1-pro-preview": "google/gemini-3.1-pro-preview [reserved]",
+    "gemini-3-5-flash": "google/gemini-3.5-flash",
+    "gemini-3-8": "google/gemini-3.8 [reserved]",
+    "gemini-3-8-flash": "google/gemini-3.8-flash [reserved]",
+    "gpt-5-4-mini": "openai/gpt-5.4-mini",
+    "gpt-5-5": "openai/gpt-5.5",
+    "gpt-5-6-luna": "openai/gpt-5.6-luna",
+    "gpt-5-6-sol": "openai/gpt-5.6-sol [reserved]",
+    "gpt-6-astra": "openai/gpt-6-astra [reserved]",
+    "haiku-4-5": "anthropic/haiku-4.5",
+    "opus-4-8": "anthropic/opus-4.8 [reserved]",
+    "sonnet-4-6": "anthropic/sonnet-4.6"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 51366,
+      "totalTokens": 51366,
+      "estimatedCostUsd": 0.012582200000000002,
+      "modelUsage": [
+        {
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "modelAlias": "gpt-5-6-luna",
+          "inputTokens": 24271,
+          "outputTokens": 1380,
+          "totalTokens": 25651,
+          "estimatedCostUsd": 0.0065102
+        },
+        {
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "modelAlias": "gpt-5-6-luna",
+          "inputTokens": 24786,
+          "outputTokens": 929,
+          "totalTokens": 25715,
+          "estimatedCostUsd": 0.006072000000000001
+        }
+      ],
+      "latencyMs": 20886,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 1,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 6708,
+      "totalTokens": 7417,
+      "estimatedCostUsd": 0.0060456,
+      "modelUsage": [
+        {
+          "inputTokens": 607,
+          "outputTokens": 102,
+          "estimatedCostUsd": 0.002438,
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "modelAlias": "gpt-5.5",
+          "totalTokens": 709
+        },
+        {
+          "inputTokens": 2221,
+          "outputTokens": 1098,
+          "estimatedCostUsd": 0.0017618,
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "modelAlias": "gpt-5.6-luna",
+          "totalTokens": 3319
+        },
+        {
+          "inputTokens": 2221,
+          "outputTokens": 1168,
+          "estimatedCostUsd": 0.0018457999999999999,
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "modelAlias": "gpt-5.6-luna",
+          "totalTokens": 3389
+        }
+      ],
+      "latencyMs": 28301,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 2,
+      "retries": 1,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

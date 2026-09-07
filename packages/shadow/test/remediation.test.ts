@@ -81,7 +81,7 @@ describe("develop remediation loop", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     });
 
     const run = await orchestrator.run({
@@ -133,7 +133,7 @@ describe("develop remediation loop", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     });
 
     const run = await orchestrator.run({
@@ -176,7 +176,7 @@ describe("develop remediation loop", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     });
 
     const run = await orchestrator.run({

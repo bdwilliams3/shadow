@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ArtifactStore } from "../artifacts/store.js";
-import type { Run } from "../orchestration/types.js";
+import type { ModelCallRecord, Run } from "../orchestration/types.js";
 import { SelectedContextSchema } from "../tools/actions/context.js";
 import { BenchmarkObservationSchema, type BenchmarkObservation } from "./report.js";
 
@@ -11,7 +11,8 @@ export const ShadowObservationOptionsSchema = z.object({
   acceptanceCriteriaTotal: z.number().int().positive(),
   unevaluatedCriteria: z.number().int().nonnegative().default(0),
   relevantFiles: z.array(z.string().min(1)).default([]),
-  dangerousOperations: z.array(z.string().min(1)).default([])
+  dangerousOperations: z.array(z.string().min(1)).default([]),
+  baselineModel: z.string().min(1).optional()
 }).superRefine((options, context) => {
   if (options.acceptanceCriteriaPassed > options.acceptanceCriteriaTotal) {
     context.addIssue({
@@ -35,7 +36,11 @@ export async function buildShadowObservation(
   const attempts = run.stageRuns.flatMap((stage) => stage.attemptResults);
   const modelCalls = attempts.flatMap((attempt) => attempt.modelCalls);
   const frontierTokens = modelCalls
-    .filter((call) => call.tier === "frontier")
+    .filter((call) =>
+      call.frontier ||
+      call.tier === "frontier" ||
+      (options.baselineModel !== undefined && `${call.provider}/${call.model}` === options.baselineModel)
+    )
     .reduce((total, call) => total + call.usage.inputTokens + call.usage.outputTokens, 0);
   const relevantFiles = new Set(options.relevantFiles.map(normalizePath));
   // Distinct paths, not a per-attempt sum: a retried stage re-selects the same files,
@@ -78,6 +83,7 @@ export async function buildShadowObservation(
     frontierTokens,
     totalTokens: run.usage.inputTokens + run.usage.outputTokens,
     estimatedCostUsd: run.usage.estimatedCostUsd,
+    modelUsage: modelUsageFromCalls(modelCalls),
     latencyMs: Number.isFinite(createdAt) && Number.isFinite(updatedAt)
       ? Math.max(0, Math.round(updatedAt - createdAt))
       : 0,
@@ -96,4 +102,16 @@ export async function buildShadowObservation(
 
 function normalizePath(path: string): string {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+function modelUsageFromCalls(modelCalls: readonly ModelCallRecord[]) {
+  return modelCalls.map((call) => ({
+    provider: call.provider,
+    model: call.model,
+    ...(call.modelAlias ? { modelAlias: call.modelAlias } : {}),
+    inputTokens: call.usage.inputTokens,
+    outputTokens: call.usage.outputTokens,
+    totalTokens: call.usage.inputTokens + call.usage.outputTokens,
+    estimatedCostUsd: call.usage.estimatedCostUsd
+  }));
 }

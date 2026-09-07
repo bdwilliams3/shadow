@@ -3,46 +3,158 @@ import type { ShadowConfig } from "./schema.js";
 export const defaultConfig: ShadowConfig = {
   version: 1,
   providers: {
-    default: {
+    openai: {
       kind: "openai-compatible",
       baseUrl: "https://api.openai.com/v1",
       apiKeyEnv: "OPENAI_API_KEY",
+      models: {
+        "gpt-6-astra": {
+          model: "gpt-6-astra",
+          maxOutputTokens: 128_000,
+          inputCostPerMillionTokens: 10.00,
+          outputCostPerMillionTokens: 50.00,
+          reservedBudget: true
+        },
+        "gpt-5-6-sol": {
+          model: "gpt-5.6-sol",
+          maxOutputTokens: 12_000,
+          inputCostPerMillionTokens: 4.00,
+          outputCostPerMillionTokens: 20.00,
+          reservedBudget: true
+        },
+        "gpt-5-6-luna": {
+          model: "gpt-5.6-luna",
+          maxOutputTokens: 128_000,
+          inputCostPerMillionTokens: 0.20,
+          outputCostPerMillionTokens: 1.20,
+          reservedBudget: false
+        },
+        "gpt-5-5": {
+          model: "gpt-5.5",
+          maxOutputTokens: 6_000,
+          inputCostPerMillionTokens: 2.00,
+          outputCostPerMillionTokens: 12.00,
+          reservedBudget: false
+        },
+        "gpt-5-4-mini": {
+          model: "gpt-5.4-mini",
+          maxOutputTokens: 3_000,
+          inputCostPerMillionTokens: 0.20,
+          outputCostPerMillionTokens: 1.20,
+          reservedBudget: false
+        }
+      },
+      structuredOutput: true,
+      maxCompletionTokensParam: true,
+      requestTimeoutMs: 120_000
+    },
+    anthropic: {
+      kind: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKeyEnv: "ANTHROPIC_API_KEY",
+      models: {
+        "fable-5-1": {
+          model: "fable-5.1",
+          maxOutputTokens: 120_000,
+          inputCostPerMillionTokens: 3,
+          outputCostPerMillionTokens: 15,
+          reservedBudget: true
+        },
+        "opus-4-8": {
+          model: "opus-4.8",
+          maxOutputTokens: 64_000,
+          inputCostPerMillionTokens: 15,
+          outputCostPerMillionTokens: 75,
+          reservedBudget: true
+        },
+        "sonnet-4-6": {
+          model: "sonnet-4.6",
+          maxOutputTokens: 64_000,
+          inputCostPerMillionTokens: 3,
+          outputCostPerMillionTokens: 15,
+          reservedBudget: false
+        },
+        "haiku-4-5": {
+          model: "haiku-4.5",
+          maxOutputTokens: 32_000,
+          inputCostPerMillionTokens: 1,
+          outputCostPerMillionTokens: 5,
+          reservedBudget: false
+        }
+      },
+      structuredOutput: false,
+      maxCompletionTokensParam: true,
+      requestTimeoutMs: 120_000
+    },
+    google: {
+      kind: "google",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      apiKeyEnv: "GEMINI_API_KEY",
+      models: {
+        "gemini-3-8": {
+          model: "gemini-3.8",
+          maxOutputTokens: 64_000,
+          inputCostPerMillionTokens: 2,
+          outputCostPerMillionTokens: 10,
+          reservedBudget: true
+        },
+        "gemini-3-8-flash": {
+          model: "gemini-3.8-flash",
+          maxOutputTokens: 65_536,
+          inputCostPerMillionTokens: 0.75,
+          outputCostPerMillionTokens: 3.75,
+          reservedBudget: true
+        },
+        "gemini-3-5-flash": {
+          model: "gemini-3.5-flash",
+          maxOutputTokens: 65_536,
+          inputCostPerMillionTokens: 1.5,
+          outputCostPerMillionTokens: 9,
+          reservedBudget: false
+        },
+        "gemini-3-1-pro-preview": {
+          model: "gemini-3.1-pro-preview",
+          maxOutputTokens: 65_536,
+          inputCostPerMillionTokens: 2,
+          outputCostPerMillionTokens: 12,
+          reservedBudget: true
+        },
+        "gemini-3-1-flash-lite": {
+          model: "gemini-3.1-flash-lite",
+          maxOutputTokens: 65_536,
+          inputCostPerMillionTokens: 0.25,
+          outputCostPerMillionTokens: 1.5,
+          reservedBudget: false
+        },
+        "gemini-2-5": {
+          model: "gemini-2.5",
+          maxOutputTokens: 64_000,
+          inputCostPerMillionTokens: 1,
+          outputCostPerMillionTokens: 5,
+          reservedBudget: false
+        },
+        "gemini-2-5-flash": {
+          model: "gemini-2.5-flash",
+          maxOutputTokens: 65_536,
+          inputCostPerMillionTokens: 0.3,
+          outputCostPerMillionTokens: 2.5,
+          reservedBudget: false
+        }
+      },
       structuredOutput: true,
       maxCompletionTokensParam: true,
       requestTimeoutMs: 120_000
     }
   },
-  models: {
-    frontier: {
-      provider: "default",
-      model: "frontier",
-      maxOutputTokens: 12_000,
-      inputCostPerMillionTokens: 0,
-      outputCostPerMillionTokens: 0
-    },
-    balanced: {
-      provider: "default",
-      model: "balanced",
-      maxOutputTokens: 6_000,
-      inputCostPerMillionTokens: 0,
-      outputCostPerMillionTokens: 0
-    },
-    economy: {
-      provider: "default",
-      model: "economy",
-      maxOutputTokens: 3_000,
-      inputCostPerMillionTokens: 0,
-      outputCostPerMillionTokens: 0
-    }
-  },
+  models: {},
   agents: {
-    plan: "frontier",
-    design: "frontier",
-    develop: "balanced",
-    test: "economy",
-    validate: "balanced",
-    deploy: "economy",
-    document: "economy"
+    plan: "fable-5-1",
+    design: "gemini-3-8",
+    develop: "sonnet-4-6",
+    test: "haiku-4-5",
+    validate: "gemini-2-5",
+    deploy: "opus-4-8",
+    document: "haiku-4-5"
   },
   budgets: {
     run: {

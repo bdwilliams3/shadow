@@ -14,11 +14,12 @@ import {
   formatBenchmarkReport,
   formatBenchmarkSummary
 } from "../benchmarks/report.js";
+import { resolveModelAlias } from "../config/schema.js";
 import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/load.js";
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
 import { createConfiguredProviders } from "../models/factory.js";
 import { stageCallsModel } from "../orchestration/planner.js";
-import type { CapabilityTier, StageName } from "../orchestration/types.js";
+import type { StageName } from "../orchestration/types.js";
 import type { ShadowConfig } from "../config/schema.js";
 import { probeModels } from "../models/probe.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
@@ -163,12 +164,14 @@ async function showStatus(runId?: string): Promise<void> {
 async function showModels(): Promise<void> {
   const { config, sources } = await loadConfig(process.cwd());
   console.log(`Config sources: ${sources.length > 0 ? sources.join(", ") : "defaults"}`);
-  for (const [stage, tier] of Object.entries(config.agents)) {
-    const model = config.models[tier];
+  for (const [stage, alias] of Object.entries(config.agents)) {
+    const model = resolveModelAlias(config, alias);
     // A tier mapped to a deterministic stage is inert. Saying so avoids the impression
     // that changing it will move any tokens.
     const note = stageCallsModel(stage as StageName) ? "" : "  (deterministic; no model call)";
-    console.log(`${stage}: ${tier} -> ${model.provider}/${model.model}${note}`);
+    const target = model ? `${model.provider}/${model.model}` : "unresolved";
+    const reserved = model?.frontier ? "  (reserved-budget accounting)" : "";
+    console.log(`${stage}: ${alias} -> ${target}${reserved}${note}`);
   }
 }
 
@@ -222,6 +225,7 @@ async function runBenchmark(
     benchmarkId: string;
     task?: string[];
     system?: string[];
+    benchmarkModel?: string;
     workRoot?: string;
     out?: string;
     report?: boolean;
@@ -252,6 +256,7 @@ async function runBenchmark(
       fixtureDirs: fixtureDirs.map((dir) => resolve(workspaceRoot, dir)),
       taskIds: options.task ?? [],
       systems: options.system ?? ["baseline", "shadow"],
+      ...(options.benchmarkModel ? { benchmarkModel: options.benchmarkModel } : {}),
       ...(options.workRoot ? { workRoot: resolve(workspaceRoot, options.workRoot) } : {})
     },
     { config, providers }
@@ -546,6 +551,7 @@ benchmark
   .requiredOption("--benchmark-id <id>", "identifier recorded on the assembled observations")
   .option("--task <ids...>", "restrict execution to these task identifiers")
   .option("--system <names...>", "systems to run: baseline, shadow")
+  .option("--benchmark-model <alias-or-model-id>", "configured alias or provider model id for the single-model baseline")
   .option("--work-root <dir>", "directory for provisioned fixture workspaces")
   .option("--out <path>", "write assembled observations to this JSON file")
   .option("--report", "build and print the paired comparison report")

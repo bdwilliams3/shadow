@@ -1,51 +1,115 @@
 version: 1
 providers:
-  default:
+  openai:
     kind: openai-compatible
     baseUrl: https://api.openai.com/v1
     apiKeyEnv: OPENAI_API_KEY
-models:
-  # Tier -> model. This is the knob: set each tier to whatever model you want to test
-  # with, independently. Tiers may share a model; that is an ordinary configuration, not
-  # a special mode. Output ceilings and prices are per-tier, so budget, reserve, and
-  # routing logic behave differently even when the models are identical.
-  #
-  # Prices are USD per 1M tokens and are yours to set — they drive budget checks and the
-  # reported cost figures, so they are only as accurate as what you put here.
-  #
-  # Production values, checked 2026-09-05 against
-  # https://developers.openai.com/api/docs/pricing (frontier price promotional at least
-  # through 2026-11-21):
-  #   frontier gpt-5.6-sol   $4.00 / $20.00
-  #   balanced gpt-5.6-terra $2.00 / $12.00
-  #   economy  gpt-5.6-luna  $0.20 / $1.20
-  frontier:
-    provider: default
-    model: gpt-5.6-sol
-    maxOutputTokens: 12000
-    inputCostPerMillionTokens: 4.00
-    outputCostPerMillionTokens: 20.00
-  balanced:
-    provider: default
-    model: gpt-5.5
-    maxOutputTokens: 6000
-    inputCostPerMillionTokens: 2.00
-    outputCostPerMillionTokens: 12.00
-  economy:
-    provider: default
-    model: gpt-5.4-mini
-    maxOutputTokens: 3000
-    inputCostPerMillionTokens: 0.20
-    outputCostPerMillionTokens: 1.20
+    models:
+      gpt-6-astra:
+        model: gpt-6-astra
+        maxOutputTokens: 128000
+        inputCostPerMillionTokens: 10.00
+        outputCostPerMillionTokens: 50.00
+        reservedBudget: true
+      gpt-5-6-sol:
+        model: gpt-5.6-sol
+        maxOutputTokens: 12000
+        inputCostPerMillionTokens: 4.00
+        outputCostPerMillionTokens: 20.00
+        reservedBudget: true
+      gpt-5-6-luna:
+        model: gpt-5.6-luna
+        maxOutputTokens: 128000
+        inputCostPerMillionTokens: 0.20
+        outputCostPerMillionTokens: 1.20
+      gpt-5-5:
+        model: gpt-5.5
+        maxOutputTokens: 6000
+        inputCostPerMillionTokens: 2.00
+        outputCostPerMillionTokens: 12.00
+      gpt-5-4-mini:
+        model: gpt-5.4-mini
+        maxOutputTokens: 3000
+        inputCostPerMillionTokens: 0.20
+        outputCostPerMillionTokens: 1.20
+  anthropic:
+    kind: anthropic
+    baseUrl: https://api.anthropic.com/v1
+    apiKeyEnv: ANTHROPIC_API_KEY
+    models:
+      fable-5-1:
+        model: fable-5.1
+        maxOutputTokens: 120000
+        inputCostPerMillionTokens: 3.00
+        outputCostPerMillionTokens: 15.00
+        reservedBudget: true
+      opus-4-8:
+        model: opus-4.8
+        maxOutputTokens: 64000
+        inputCostPerMillionTokens: 15.00
+        outputCostPerMillionTokens: 75.00
+        reservedBudget: true
+      sonnet-4-6:
+        model: sonnet-4.6
+        maxOutputTokens: 64000
+        inputCostPerMillionTokens: 3.00
+        outputCostPerMillionTokens: 15.00
+      haiku-4-5:
+        model: haiku-4.5
+        maxOutputTokens: 32000
+        inputCostPerMillionTokens: 1.00
+        outputCostPerMillionTokens: 5.00
+  google:
+    kind: google
+    baseUrl: https://generativelanguage.googleapis.com/v1beta
+    apiKeyEnv: GEMINI_API_KEY
+    models:
+      gemini-3-8:
+        model: gemini-3.8
+        maxOutputTokens: 64000
+        inputCostPerMillionTokens: 2.00
+        outputCostPerMillionTokens: 10.00
+        reservedBudget: true
+      gemini-3-8-flash:
+        model: gemini-3.8-flash
+        maxOutputTokens: 65536
+        inputCostPerMillionTokens: 0.75
+        outputCostPerMillionTokens: 3.75
+        reservedBudget: true
+      gemini-3-5-flash:
+        model: gemini-3.5-flash
+        maxOutputTokens: 65536
+        inputCostPerMillionTokens: 1.50
+        outputCostPerMillionTokens: 9.00
+      gemini-3-1-pro-preview:
+        model: gemini-3.1-pro-preview
+        maxOutputTokens: 65536
+        inputCostPerMillionTokens: 2.00
+        outputCostPerMillionTokens: 12.00
+        reservedBudget: true
+      gemini-3-1-flash-lite:
+        model: gemini-3.1-flash-lite
+        maxOutputTokens: 65536
+        inputCostPerMillionTokens: 0.25
+        outputCostPerMillionTokens: 1.50
+      gemini-2-5:
+        model: gemini-2.5
+        maxOutputTokens: 64000
+        inputCostPerMillionTokens: 1.00
+        outputCostPerMillionTokens: 5.00
+      gemini-2-5-flash:
+        model: gemini-2.5-flash
+        maxOutputTokens: 65536
+        inputCostPerMillionTokens: 0.30
+        outputCostPerMillionTokens: 2.50
 agents:
-  # Spec §9 mapping. Which tier a stage asks for; the table above decides what that means.
-  plan: frontier
-  design: balanced
-  develop: balanced
-  test: economy
-  validate: economy
-  deploy: economy
-  document: economy
+  plan: gpt-5.5
+  design: gpt-5.6-luna
+  develop: gpt-5.6-luna
+  test: gemini-2-5-flash
+  validate: gemini-3-1-pro-preview
+  deploy: gpt-5.6-luna
+  document: gemini-2-5-flash
 budgets:
   run:
     maxInputTokens: 120000

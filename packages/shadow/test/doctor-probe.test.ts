@@ -3,20 +3,58 @@ import { probeModels } from "../src/models/probe.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import type { ModelProvider } from "../src/models/provider.js";
 
-function configWith(models: Record<"frontier" | "balanced" | "economy", string>) {
+function configWith(models: Record<"primary" | "secondary" | "duplicate", string>) {
   const config = structuredClone(defaultConfig);
-  for (const tier of ["frontier", "balanced", "economy"] as const) {
-    config.models[tier].model = models[tier];
-  }
+  config.providers = {
+    test: {
+      kind: "mock",
+      models: {
+        primary: {
+          model: models.primary,
+          maxOutputTokens: 100,
+          inputCostPerMillionTokens: 0,
+          outputCostPerMillionTokens: 0,
+          reservedBudget: true
+        },
+        secondary: {
+          model: models.secondary,
+          maxOutputTokens: 100,
+          inputCostPerMillionTokens: 0,
+          outputCostPerMillionTokens: 0,
+          reservedBudget: false
+        },
+        duplicate: {
+          model: models.duplicate,
+          maxOutputTokens: 100,
+          inputCostPerMillionTokens: 0,
+          outputCostPerMillionTokens: 0,
+          reservedBudget: false
+        }
+      },
+      structuredOutput: true,
+      maxCompletionTokensParam: true,
+      requestTimeoutMs: 120_000
+    }
+  };
+  config.models = {};
+  config.agents = {
+    plan: "primary",
+    design: "secondary",
+    develop: "duplicate",
+    test: "duplicate",
+    validate: "secondary",
+    deploy: "duplicate",
+    document: "duplicate"
+  };
   return config;
 }
 
 describe("doctor --probe", () => {
   it("reports the provider's own error for a model that is not reachable", async () => {
     const config = configWith({
-      frontier: "works",
-      balanced: "wrong-endpoint",
-      economy: "works"
+      primary: "works",
+      secondary: "wrong-endpoint",
+      duplicate: "works"
     });
     const provider: ModelProvider = {
       async complete(request) {
@@ -29,17 +67,17 @@ describe("doctor --probe", () => {
       }
     };
     const lines: string[] = [];
-    const ok = await probeModels(config, new Map([["default", provider]]), (line) => lines.push(line));
+    const ok = await probeModels(config, new Map([["test", provider]]), (line) => lines.push(line));
 
     expect(ok).toBe(false);
     expect(lines.some((line) => line.includes("wrong-endpoint") && line.includes("404"))).toBe(true);
-    // Tiers sharing a reachable model are probed once and named together.
-    expect(lines.some((line) => line.startsWith("frontier, economy -> default/works: reachable"))).toBe(true);
+    // Aliases sharing a reachable model are probed once and named together.
+    expect(lines.some((line) => line.startsWith("duplicate, primary -> test/works: reachable"))).toBe(true);
     expect(lines).toHaveLength(2);
   });
 
-  it("passes when every configured tier model answers", async () => {
-    const config = configWith({ frontier: "a", balanced: "b", economy: "c" });
+  it("passes when every configured agent model answers", async () => {
+    const config = configWith({ primary: "a", secondary: "b", duplicate: "c" });
     const calls: string[] = [];
     const provider: ModelProvider = {
       async complete(request) {
@@ -47,7 +85,7 @@ describe("doctor --probe", () => {
         return { text: '{"ok":"ok"}', usage: { inputTokens: 1, outputTokens: 1, estimatedCostUsd: 0 } };
       }
     };
-    expect(await probeModels(config, new Map([["default", provider]]), () => {})).toBe(true);
+    expect(await probeModels(config, new Map([["test", provider]]), () => {})).toBe(true);
     expect(calls.sort()).toEqual(["a", "b", "c"]);
   });
 });

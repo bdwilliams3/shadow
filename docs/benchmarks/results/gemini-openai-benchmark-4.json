@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "openai/gpt-5.6-luna",
+  "shadowConfig": "plan=gpt-5.6-luna,design=gpt-5.5,develop=gpt-5.5,test=gemini-2-5-flash,validate=gemini-3-1-pro-preview,deploy=gpt-5.5,document=gemini-2-5-flash",
+  "workRoot": "/tmp/shadow-bench.ADKnvk",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/baseline",
+      "status": "failed",
+      "summary": "error: corrupt patch at line 26\n",
+      "changedFiles": [],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "a5cc56e9-e338-4a25-885a-b8cd48b38d7c",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/f8/f8c3af709d93e047924ec351294f07c3bd66e15195a7708d2f081d575fa953f9-baseline.patch",
+          "sha256": "f8c3af709d93e047924ec351294f07c3bd66e15195a7708d2f081d575fa953f9",
+          "bytes": 3559
+        },
+        {
+          "id": "87786743-be9f-46b1-b3b0-01d54ff04ac9",
+          "kind": "action.stderr",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/bc/bc454c05fc8997f58fc75f968725ef8532838934542e32a84c39f8624df41517-patch.check.stderr.log",
+          "sha256": "bc454c05fc8997f58fc75f968725ef8532838934542e32a84c39f8624df41517",
+          "bytes": 32
+        },
+        {
+          "id": "74ddf5fd-e824-4076-8f28-400dcd4cb066",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/45/456553652bcc0283b1bd346a6ca0689dae24f5bea165c9a14d2b929cdf088d26-patch.check.result.json",
+          "sha256": "456553652bcc0283b1bd346a6ca0689dae24f5bea165c9a14d2b929cdf088d26",
+          "bytes": 139
+        }
+      ]
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow",
+      "status": "COMPLETED",
+      "summary": "plan: Planned develop, test, validate. | develop: Applied patch affecting 1 files. Repaired: malformed hunk line counts recounted. | test: No test command is configured. | validate: Validation inspected 1 changed files; No typecheck command is configured. Secret scan inspected 29 files with no findings. No package.json dependency manifests were found.",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "4f2cc356-7e94-4b86-addf-0543e130e450",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "bb29985e-d313-4adc-9084-079642b79a5c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "79065203-bd5f-487e-83b5-9753be3fe408",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "862e551b-65e3-4a18-86b4-348a1b086e9e",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "9dcb3c11-60e2-44ab-87ef-6827ef8efa43",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3c/3c9c913720dafab1e82ee68491702728aa080ca200ddda708e3ebf52fc9e1755-plan.result.json",
+          "sha256": "3c9c913720dafab1e82ee68491702728aa080ca200ddda708e3ebf52fc9e1755",
+          "bytes": 1328
+        },
+        {
+          "id": "66887fe2-0bbd-4827-8714-ebb8a5cc70d9",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a2/a2cdb2623b99b4e4e3913d00b18b5ef43bd92b7ae2c83efba2075718e695fd59-context.select.stdout.log",
+          "sha256": "a2cdb2623b99b4e4e3913d00b18b5ef43bd92b7ae2c83efba2075718e695fd59",
+          "bytes": 1184
+        },
+        {
+          "id": "fd8a9e30-fc94-432c-9ecf-cd707938cb80",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72-context.select.result.json",
+          "sha256": "997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72",
+          "bytes": 6801
+        },
+        {
+          "id": "e6877276-513a-49d8-a24b-878f9b425a35",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/22/220f4e289c25653b668e42cc29069c831f0a891d94668a968863062c44e95a4c-git.status.stdout.log",
+          "sha256": "220f4e289c25653b668e42cc29069c831f0a891d94668a968863062c44e95a4c",
+          "bytes": 849
+        },
+        {
+          "id": "09f45d34-55b4-4422-9334-cecbd15c9a40",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/29/29639cc6c6a04953d8d9b173c32eda941c0cc13be69f0401de1ec8509b35bee2-develop.patch",
+          "sha256": "29639cc6c6a04953d8d9b173c32eda941c0cc13be69f0401de1ec8509b35bee2",
+          "bytes": 2645
+        },
+        {
+          "id": "82f0df96-c529-405d-905c-a62c053b0ac2",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/90/90aa8f007c9cc4d352a2033fcf7044e633ee29fb2cc2e6247dd72cadef739912-patch.check.stdout.log",
+          "sha256": "90aa8f007c9cc4d352a2033fcf7044e633ee29fb2cc2e6247dd72cadef739912",
+          "bytes": 20
+        },
+        {
+          "id": "170c3ab6-ee58-4255-a2ed-1467bf42478b",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "c9e92e20-9e90-46fa-842d-137122994846",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "fb72a7d0-6933-4e09-abdb-c1ed8dbbf60c",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        },
+        {
+          "id": "696eb2de-ec2c-4612-b244-91a511c6c6bf",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/df/df43123320f823d5fe51a04ce0407bed945227a699842cadcb3933f00f4eca2c-git.status.stdout.log",
+          "sha256": "df43123320f823d5fe51a04ce0407bed945227a699842cadcb3933f00f4eca2c",
+          "bytes": 1535
+        },
+        {
+          "id": "5a00e495-5394-4e83-9b98-3c89ceb5aac3",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/43/43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464-git.status.result.json",
+          "sha256": "43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464",
+          "bytes": 174
+        },
+        {
+          "id": "c44fbc00-648f-4a22-8328-9a57539c36a1",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/e3/e34409567f68a447c389f3a6bfa1497b51bb4480189ac4d0d8be6a4009167070-tests.select.stdout.log",
+          "sha256": "e34409567f68a447c389f3a6bfa1497b51bb4480189ac4d0d8be6a4009167070",
+          "bytes": 2276
+        },
+        {
+          "id": "9d5f0cd0-71e2-4b96-ab83-9cd215f24e71",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/24/24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7-tests.select.result.json",
+          "sha256": "24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7",
+          "bytes": 170
+        },
+        {
+          "id": "cee44387-132c-4a2b-96de-8fefeb2573a8",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/1b/1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87-quality.test.result.json",
+          "sha256": "1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87",
+          "bytes": 52
+        },
+        {
+          "id": "8d123ccd-abbd-4d8b-872a-eed495341e11",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c4/c4492252edec45dbfd94a7c4532dcc62ebff4aea8e5bbb5663821d07416db183-git.status.stdout.log",
+          "sha256": "c4492252edec45dbfd94a7c4532dcc62ebff4aea8e5bbb5663821d07416db183",
+          "bytes": 2348
+        },
+        {
+          "id": "4c6679df-a935-4a78-a2b7-186226f3dc3b",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/58/581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee-quality.typecheck.result.json",
+          "sha256": "581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee",
+          "bytes": 57
+        },
+        {
+          "id": "9bf4a665-e381-4cb1-a03f-4bb3bf0fb6cc",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d4/d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492-security.secrets.result.json",
+          "sha256": "d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492",
+          "bytes": 138
+        },
+        {
+          "id": "4073f752-1667-4e6d-b5a2-65d636c8c792",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3e/3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878-security.dependencies.result.json",
+          "sha256": "3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878",
+          "bytes": 127
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "modelAliases": {
+    "fable-5-1": "anthropic/fable-5.1 [reserved]",
+    "gemini-2-5": "google/gemini-2.5",
+    "gemini-2-5-flash": "google/gemini-2.5-flash",
+    "gemini-3-1-flash-lite": "google/gemini-3.1-flash-lite",
+    "gemini-3-1-pro-preview": "google/gemini-3.1-pro-preview [reserved]",
+    "gemini-3-5-flash": "google/gemini-3.5-flash",
+    "gemini-3-8": "google/gemini-3.8 [reserved]",
+    "gemini-3-8-flash": "google/gemini-3.8-flash [reserved]",
+    "gpt-5-4-mini": "openai/gpt-5.4-mini",
+    "gpt-5-5": "openai/gpt-5.5",
+    "gpt-5-6-luna": "openai/gpt-5.6-luna",
+    "gpt-5-6-sol": "openai/gpt-5.6-sol [reserved]",
+    "gpt-6-astra": "openai/gpt-6-astra [reserved]",
+    "haiku-4-5": "anthropic/haiku-4.5",
+    "opus-4-8": "anthropic/opus-4.8 [reserved]",
+    "sonnet-4-6": "anthropic/sonnet-4.6"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 26032,
+      "totalTokens": 26032,
+      "estimatedCostUsd": 0.0071004,
+      "latencyMs": 20857,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 0,
+      "totalTokens": 5159,
+      "estimatedCostUsd": 0.0277726,
+      "latencyMs": 22383,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/config/defaults.js";
+import { resolveModelAlias } from "../src/config/schema.js";
 import type { ModelProvider } from "../src/models/provider.js";
 import { TestRunSummarySchema } from "../src/mcp/tests/types.js";
 import type { TestRunRequest } from "../src/mcp/tests/types.js";
@@ -58,7 +59,7 @@ describe("orchestration controls", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     });
 
     // Plan is the first stage to reach a provider, and it does so while the run is still
@@ -116,7 +117,7 @@ describe("orchestration controls", () => {
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     let testRequest: TestRunRequest | undefined;
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]]),
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]]),
       testsExecutor: {
         async runTests(request) {
           testRequest = request;
@@ -152,7 +153,9 @@ describe("orchestration controls", () => {
   it("applies prior attempt usage to the stage budget before retrying", async () => {
     const workspace = await fixtureWorkspace();
     const config = structuredClone(defaultConfig);
-    config.models.balanced.maxOutputTokens = 100;
+    const developAlias = resolveModelAlias(config, config.agents.develop);
+    expect(developAlias).toBeDefined();
+    config.providers[developAlias!.provider]!.models[developAlias!.alias]!.maxOutputTokens = 100;
     config.budgets.stage.maxInputTokens = 4_000;
     config.budgets.stage.maxOutputTokens = 4_000;
     config.budgets.stage.maxTotalTokens = 3_000;
@@ -169,7 +172,7 @@ describe("orchestration controls", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const run = await new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     }).run({
       request: "change hello.txt from old to new",
       workspaceRoot: workspace,
@@ -205,7 +208,7 @@ describe("orchestration controls", () => {
     });
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]]),
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]]),
       cancellationPollMs: 10
     });
     const running = orchestrator.run({
@@ -230,9 +233,14 @@ describe("orchestration controls", () => {
     const workspace = await fixtureWorkspace();
     const config = structuredClone(defaultConfig);
     config.approvals.requireApprovalForNetwork = true;
+    const provider: ModelProvider = { complete: async () => response(updatePatch()) };
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(config, store, {
-      providers: new Map([["default", { complete: async () => response(updatePatch()) }]])
+      providers: new Map([
+        ["anthropic", provider],
+        ["google", provider],
+        ["openai", provider]
+      ])
     });
     const waiting = await orchestrator.run({
       request: "change hello.txt from old to new",
@@ -255,7 +263,7 @@ describe("orchestration controls", () => {
     };
     const store = new SQLitePersistenceStore(join(workspace, ".shadow/shadow.db"));
     const orchestrator = new LifecycleOrchestrator(defaultConfig, store, {
-      providers: new Map([["default", provider]])
+      providers: new Map([["anthropic", provider], ["google", provider], ["openai", provider]])
     });
     const completed = await orchestrator.run({
       request: "change hello.txt from old to new",

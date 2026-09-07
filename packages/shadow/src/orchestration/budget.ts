@@ -1,4 +1,4 @@
-import type { Budget, CapabilityTier, UsageTotals } from "./types.js";
+import type { Budget, UsageTotals } from "./types.js";
 
 export interface BudgetDecision {
   allowed: boolean;
@@ -21,7 +21,7 @@ export function checkBudget(
   budget: Budget,
   current: UsageTotals,
   planned: UsageTotals,
-  tier: CapabilityTier
+  frontierModel: boolean
 ): BudgetDecision {
   const next = addUsage(current, planned);
   const reasons: string[] = [];
@@ -41,7 +41,7 @@ export function checkBudget(
     );
   }
   if (
-    tier !== "frontier" &&
+    !frontierModel &&
     budget.reservedFrontierTokens > 0 &&
     totalTokens(next) > budget.maxTotalTokens - budget.reservedFrontierTokens
   ) {

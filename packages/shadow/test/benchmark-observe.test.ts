@@ -40,7 +40,9 @@ describe("benchmark observation capture", () => {
       }],
       modelCalls: [{
         id: "model-call",
-        tier: "frontier",
+        tier: "gpt-5-6-luna",
+        modelAlias: "gpt-5-6-luna",
+        frontier: false,
         provider: "provider",
         model: "model",
         status: "completed",
@@ -94,7 +96,8 @@ describe("benchmark observation capture", () => {
       acceptanceCriteriaPassed: 3,
       acceptanceCriteriaTotal: 3,
       relevantFiles: ["src/target.ts"],
-      dangerousOperations: []
+      dangerousOperations: [],
+      baselineModel: "provider/model"
     }, artifacts);
 
     expect(observation).toMatchObject({
@@ -102,6 +105,26 @@ describe("benchmark observation capture", () => {
       succeeded: true,
       frontierTokens: 300,
       totalTokens: 300,
+      modelUsage: [
+        {
+          provider: "provider",
+          model: "model",
+          modelAlias: "gpt-5-6-luna",
+          inputTokens: 100,
+          outputTokens: 50,
+          totalTokens: 150,
+          estimatedCostUsd: 0.2
+        },
+        {
+          provider: "provider",
+          model: "model",
+          modelAlias: "gpt-5-6-luna",
+          inputTokens: 100,
+          outputTokens: 50,
+          totalTokens: 150,
+          estimatedCostUsd: 0.2
+        }
+      ],
       latencyMs: 2_000,
       humanInterventions: 1,
       // One distinct irrelevant path, even though two attempts each selected it.

@@ -23,7 +23,6 @@ import { createStageTask, planWorkflow } from "./planner.js";
 import { assertTransition, stateForStage } from "./state-machine.js";
 import type {
   ApprovalRecord,
-  CapabilityTier,
   PlanRevision,
   Run,
   RunState,
@@ -39,6 +38,7 @@ export interface RunRequest {
   workspaceRoot: string;
   dryRun: boolean;
   allowedChangedFiles?: string[];
+  acceptanceCriteria?: string[];
 }
 
 export interface OrchestratorDependencies {
@@ -88,7 +88,8 @@ export class LifecycleOrchestrator {
       input.request,
       this.config,
       input.dryRun,
-      input.allowedChangedFiles
+      input.allowedChangedFiles,
+      input.acceptanceCriteria
     );
     run.openRisks = planned.risks;
     run.stageTasks = planned.stages;
@@ -433,7 +434,7 @@ export class LifecycleOrchestrator {
    *
    * The revision is a proposal, not an instruction. Everything that governs cost or blast
    * radius stays with configuration and the stage table: enablement, canonical ordering,
-   * allowed tools, write permissions, and the ceiling on capability tier. What the plan
+   * allowed tools, write permissions, and configured model aliases. What the plan
    * genuinely decides is which stages run and what done means for each.
    *
    * Stages at or before `currentIndex` have already executed and are never touched, so a
@@ -484,7 +485,9 @@ export class LifecycleOrchestrator {
         goal: planned?.goal ?? run.request,
         budget: this.config.budgets.stage,
         dryRun: run.dryRun,
-        acceptanceCriteria: planned?.acceptanceCriteria ?? [],
+        acceptanceCriteria: existing?.acceptanceCriteria.length
+          ? existing.acceptanceCriteria
+          : (planned?.acceptanceCriteria ?? []),
         ...(existing?.allowedChangedFiles !== undefined
           ? { allowedChangedFiles: existing.allowedChangedFiles }
           : {}),
@@ -498,17 +501,21 @@ export class LifecycleOrchestrator {
 
     const revisedRuns = revisedTasks.map<StageRun>((task) => {
       const existing = run.stageRuns.find((candidate) => candidate.id === task.id);
-      const configured = this.config.agents[task.stage];
       const recommended = plannedByStage.get(task.stage)?.recommendedTier;
-      const tier = this.clampTier(task.stage, configured, recommended, risks);
+      if (recommended) {
+        risks.push(
+          `Plan recommended ${recommended} for ${task.stage}; direct model alias ` +
+            `${this.config.agents[task.stage]} from configuration was kept.`
+        );
+      }
       return existing
-        ? { ...existing, stage: task.stage, modelTier: tier }
+        ? { ...existing, stage: task.stage, modelTier: this.config.agents[task.stage] }
         : {
             id: task.id,
             runId: run.id,
             stage: task.stage,
             status: "pending",
-            modelTier: tier,
+            modelTier: this.config.agents[task.stage],
             attempts: 0,
             attemptResults: []
           };
@@ -536,33 +543,8 @@ export class LifecycleOrchestrator {
           .filter((task) => task.acceptanceCriteria.length > 0)
           .map((task) => [task.stage, task.acceptanceCriteria])
       ),
-      modelTiers: Object.fromEntries(revisedRuns.map((entry) => [entry.stage, entry.modelTier]))
+      modelAliases: Object.fromEntries(revisedRuns.map((entry) => [entry.stage, entry.modelTier]))
     });
-  }
-
-  /**
-   * Configuration is the authority on spend. A plan may ask for a cheaper tier than the
-   * one configured for a stage and get it; asking for a more capable one is recorded as a
-   * risk and refused, so no model can quietly escalate a run's cost.
-   */
-  private clampTier(
-    stage: StageName,
-    configured: CapabilityTier,
-    recommended: CapabilityTier | undefined,
-    risks: string[]
-  ): CapabilityTier {
-    if (!recommended || recommended === configured) {
-      return configured;
-    }
-    const capability: Record<CapabilityTier, number> = { economy: 0, balanced: 1, frontier: 2 };
-    if (capability[recommended] < capability[configured]) {
-      return recommended;
-    }
-    risks.push(
-      `Plan recommended the ${recommended} tier for ${stage}; configuration caps it at ` +
-        `${configured} and the recommendation was not applied.`
-    );
-    return configured;
   }
 
   /**

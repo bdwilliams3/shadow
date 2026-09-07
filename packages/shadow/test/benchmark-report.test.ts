@@ -18,6 +18,36 @@ function observation(system: "baseline" | "shadow", taskId: string) {
     frontierTokens: system === "baseline" ? 10_000 : 5_000,
     totalTokens: system === "baseline" ? 10_000 : 7_000,
     estimatedCostUsd: system === "baseline" ? 1 : 0.5,
+    modelUsage: system === "baseline"
+      ? [{
+          provider: "provider",
+          model: "frontier",
+          modelAlias: "gpt-frontier",
+          inputTokens: 8_000,
+          outputTokens: 2_000,
+          totalTokens: 10_000,
+          estimatedCostUsd: 1
+        }]
+      : [
+          {
+            provider: "provider",
+            model: "economy",
+            modelAlias: "haiku",
+            inputTokens: 1_500,
+            outputTokens: 500,
+            totalTokens: 2_000,
+            estimatedCostUsd: 0.25
+          },
+          {
+            provider: "provider",
+            model: "frontier",
+            modelAlias: "gpt-frontier",
+            inputTokens: 4_000,
+            outputTokens: 1_000,
+            totalTokens: 5_000,
+            estimatedCostUsd: 0.25
+          }
+        ],
     latencyMs: system === "baseline" ? 1_000 : 800,
     humanInterventions: system === "baseline" ? 0 : 1,
     dangerousActionsAttempted: 1,
@@ -49,7 +79,12 @@ describe("benchmark reports", () => {
     expect(report.frontierTokenReduction).toBe(0.5);
     expect(report.qualityRetention).toBe(0.9);
     expect(report.medianInterventionDelta).toBe(1);
-    expect(formatBenchmarkReport(report)).toContain("Benchmark fixture-suite-v1: PASS");
+    const output = formatBenchmarkReport(report);
+    expect(output).toContain("Benchmark fixture-suite-v1: PASS");
+    expect(output).toContain("Reserved/baseline-model tokens: 10000 vs 20000");
+    expect(output).toContain("Model usage (shadow):");
+    expect(output).toContain("provider/frontier as gpt-frontier: 10000 tok, $0.5000");
+    expect(output).toContain("Model usage (baseline): provider/frontier as gpt-frontier: 20000 tok, $2.0000");
   });
 
   it("fails closed when task observations are not paired", () => {
@@ -181,6 +216,22 @@ describe("benchmark reports", () => {
     expect(report.thresholds.dangerousActionRejection).toBe(false);
     expect(report.passed).toBe(false);
   });
+
+  it("marks model usage unavailable for older result files", () => {
+    const legacyObservation = {
+      ...observation("shadow", "task-a"),
+      modelUsage: undefined
+    };
+    const report = buildBenchmarkReport({
+      version: 1,
+      benchmarkId: "legacy",
+      baselineModel: "provider/frontier",
+      shadowConfig: "config-v1",
+      observations: [observation("baseline", "task-a"), legacyObservation]
+    });
+
+    expect(formatBenchmarkReport(report)).toContain("Model usage (shadow): unavailable in this result file");
+  });
 });
 
 describe("single-system summary", () => {
@@ -216,6 +267,8 @@ describe("single-system summary", () => {
 
     const text = formatBenchmarkSummary(summary);
     expect(text).toContain("shadow only (no comparison)");
+    expect(text).toContain("Reserved/baseline-model tokens:");
+    expect(text).toContain("Model usage (shadow):");
     // No verdict and no ratio: there is nothing to compare against. The closing note
     // naming the missing gate is allowed, and is the point.
     expect(text).not.toMatch(/^Benchmark .*: (PASS|FAIL)$/m);

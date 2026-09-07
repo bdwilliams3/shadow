@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { ShadowConfig } from "../config/schema.js";
+import { resolveModelAlias, type ShadowConfig } from "../config/schema.js";
 import { checkBudget } from "../orchestration/budget.js";
 import type {
   Budget,
-  CapabilityTier,
+  ModelAlias,
   ModelCallRecord,
   UsageTotals
 } from "../orchestration/types.js";
@@ -19,7 +19,7 @@ const zeroUsage: UsageTotals = {
 };
 
 export interface StructuredModelCall<T> {
-  tier: CapabilityTier;
+  tier: ModelAlias;
   system: string;
   input: unknown;
   schemaName: string;
@@ -70,7 +70,25 @@ export class ModelRouter {
 
   async completeStructured<T>(call: StructuredModelCall<T>): Promise<StructuredModelResult<T>> {
     const startedAt = performance.now();
-    const alias = this.config.models[call.tier];
+    const alias = resolveModelAlias(this.config, call.tier);
+    if (!alias) {
+      const reason = `Model alias ${call.tier} is not configured.`;
+      throw new ModelRoutingError(reason, {
+        id: randomUUID(),
+        tier: call.tier,
+        modelAlias: call.tier,
+        frontier: false,
+        provider: "unknown",
+        model: "unknown",
+        estimatedInputTokens: 0,
+        requestedOutputTokens: 1,
+        approvalRequired: false,
+        status: "blocked",
+        durationMs: Math.round(performance.now() - startedAt),
+        usage: zeroUsage,
+        reason
+      });
+    }
     const provider = this.providers.get(alias.provider);
     const serializedInput = JSON.stringify(call.input);
     const estimatedInputTokens = this.estimator.estimate(call.system) + this.estimator.estimate(serializedInput);
@@ -89,6 +107,8 @@ export class ModelRouter {
     const baseRecord = {
       id: randomUUID(),
       tier: call.tier,
+      modelAlias: call.tier,
+      frontier: alias.frontier,
       provider: alias.provider,
       model: alias.model,
       estimatedInputTokens,
@@ -133,9 +153,9 @@ export class ModelRouter {
     }
 
     const reasons = [
-      ...checkBudget(this.config.budgets.modelCall, zeroUsage, planned, call.tier).reasons,
-      ...checkBudget(call.stageBudget, call.stageUsage, planned, call.tier).reasons,
-      ...checkBudget(call.runBudget, call.runUsage, planned, call.tier).reasons
+      ...checkBudget(this.config.budgets.modelCall, zeroUsage, planned, alias.frontier).reasons,
+      ...checkBudget(call.stageBudget, call.stageUsage, planned, alias.frontier).reasons,
+      ...checkBudget(call.runBudget, call.runUsage, planned, alias.frontier).reasons
     ];
     if (reasons.length > 0) {
       const reason = [...new Set(reasons)].join("; ");

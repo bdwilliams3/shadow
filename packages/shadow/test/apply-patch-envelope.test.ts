@@ -8,6 +8,7 @@ import { ArtifactStore } from "../src/artifacts/store.js";
 import { defaultConfig } from "../src/config/defaults.js";
 import {
   ApplyPatchEnvelopeError,
+  looksLikeApplyPatchFragment,
   looksLikeApplyPatchEnvelope,
   translateApplyPatchEnvelope
 } from "../src/tools/actions/apply-patch-envelope.js";
@@ -81,6 +82,45 @@ describe("apply_patch envelope translation", () => {
         ["diff --git a/a.txt b/a.txt", "--- a/a.txt", "+++ b/a.txt", "@@ -1 +1 @@", "-a", "+b"].join("\n")
       )
     ).toBe(false);
+    expect(looksLikeApplyPatchFragment(recordedEnvelope)).toBe(false);
+    expect(looksLikeApplyPatchFragment("*** Update File: shadow_fixture.py\n@@\n-old\n+new\n"))
+      .toBe(true);
+  });
+
+  it("extracts a loose apply_patch fragment after malformed diff preamble", async () => {
+    const workspace = await workspaceWith({ "shadow_fixture.py": fixtureSource });
+    const looseFragment = [
+      "diff --git a/ignored.py b/ignored.py",
+      "@@ -1 +1 @@",
+      "```yaml",
+      "*** Update File: shadow_fixture.py",
+      "@@",
+      " def main() -> None:",
+      "     parser = argparse.ArgumentParser()",
+      "-    parser.parse_args()",
+      "-    print(greeting())",
+      '+    parser.add_argument("--name", default="world")',
+      "+    args = parser.parse_args()",
+      "+    print(greeting(args.name))",
+      "*** End Patch",
+      ""
+    ].join("\n");
+
+    const checked = await runner(workspace).run<PatchResult>("patch.check", {
+      patch: looseFragment
+    });
+    const applied = await runner(workspace).run<PatchResult>(
+      "patch.apply",
+      { patch: looseFragment },
+      { allowWorkspaceWrites: true }
+    );
+
+    expect(checked.output).toMatchObject({ valid: true, changedFiles: ["shadow_fixture.py"] });
+    expect(checked.record.summary).toContain("apply_patch envelope");
+    expect(applied.output?.applied).toBe(true);
+    expect(await readFile(join(workspace, "shadow_fixture.py"), "utf8")).toContain(
+      "print(greeting(args.name))"
+    );
   });
 
   it("applies the envelope that lost greeting-option in run 4", async () => {
@@ -216,6 +256,37 @@ describe("apply_patch envelope translation", () => {
       " five",
       "-six",
       "+SIX",
+      "*** End Patch",
+      ""
+    ].join("\n");
+
+    const applied = await runner(workspace).run<PatchResult>(
+      "patch.apply",
+      { patch: envelope },
+      { allowWorkspaceWrites: true }
+    );
+
+    expect(applied.output?.applied).toBe(true);
+    expect(await readFile(join(workspace, "multi.txt"), "utf8")).toBe(
+      ["one", "TWO", "three", "four", "five", "SIX"].join("\n") + "\n"
+    );
+  });
+
+  it("places out-of-order hunks by file position before emitting a diff", async () => {
+    const workspace = await workspaceWith({
+      "multi.txt": ["one", "two", "three", "four", "five", "six"].join("\n") + "\n"
+    });
+    const envelope = [
+      "*** Begin Patch",
+      "*** Update File: multi.txt",
+      "@@",
+      " five",
+      "-six",
+      "+SIX",
+      "@@",
+      " one",
+      "-two",
+      "+TWO",
       "*** End Patch",
       ""
     ].join("\n");

@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "anthropic/fable-5.1",
+  "shadowConfig": "plan=gpt-5.6-luna,design=gpt-5.5,develop=gpt-5.5,test=gemini-2-5-flash,validate=gemini-3-1-pro-preview,deploy=gpt-5.5,document=gemini-2-5-flash",
+  "workRoot": "/tmp/shadow-bench.ADKnvk",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/baseline",
+      "status": "failed",
+      "changedFiles": [],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: AssertionError: no timeout setting found"
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow",
+      "status": "COMPLETED",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "e7e1c0aa-5734-4d32-9794-b03b16909cc6",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "bd686e8e-1c1a-4940-b483-e0e2abf2189f",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "7d47f29f-e248-427c-84e8-a29f63904e3f",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "9bd25627-e7b9-4428-b3cf-531e2b84f093",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "bc271132-1749-4924-a03e-9614c823aec8",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/9969415945ca3e37233b7efea913486ac90fcb0024c8dd6e0bbfb8e609d4ee69-plan.result.json",
+          "sha256": "9969415945ca3e37233b7efea913486ac90fcb0024c8dd6e0bbfb8e609d4ee69",
+          "bytes": 1073
+        },
+        {
+          "id": "c38c512a-716e-4e7e-99aa-48a2c1aebe7e",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ad/ad678268177eb0947b9651a9cfc5d34f859ba7f1f17c9498cb1b6e24a729474b-context.select.stdout.log",
+          "sha256": "ad678268177eb0947b9651a9cfc5d34f859ba7f1f17c9498cb1b6e24a729474b",
+          "bytes": 1184
+        },
+        {
+          "id": "c92d2ba6-fc35-4da7-8ed6-45933715fd99",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72-context.select.result.json",
+          "sha256": "997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72",
+          "bytes": 6801
+        },
+        {
+          "id": "a0f74885-fbe0-4acd-94bb-70e6783e59e4",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/2e/2ee5bec3f30198a61fb659bebdc8389e5c6b07f8ad9b77e8a52596cf63fbe4c4-git.status.stdout.log",
+          "sha256": "2ee5bec3f30198a61fb659bebdc8389e5c6b07f8ad9b77e8a52596cf63fbe4c4",
+          "bytes": 849
+        },
+        {
+          "id": "4cb1fe3d-7d49-47a2-bb66-08dfd2ead0c8",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/32/32b56736bb47a6f808e0737986c73facfde4951f57f571e49b35dce6f73a2c94-develop.patch",
+          "sha256": "32b56736bb47a6f808e0737986c73facfde4951f57f571e49b35dce6f73a2c94",
+          "bytes": 2426
+        },
+        {
+          "id": "1fa30edc-70d9-4b81-bef8-60c3b2ab2bf6",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/12/12a54c15a6d88e3b753f99010c2746e6b9e2c0228406776c86ba574efd5136f9-patch.check.stdout.log",
+          "sha256": "12a54c15a6d88e3b753f99010c2746e6b9e2c0228406776c86ba574efd5136f9",
+          "bytes": 20
+        },
+        {
+          "id": "3104a640-2d08-4251-b096-2710c1a54b9d",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "c738cc19-d2d3-4928-acaa-325ede4f9b91",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "3e633dc7-b579-43c2-bef1-77a0aeb37650",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        },
+        {
+          "id": "faa02a89-8288-4d54-849b-6bc14223515c",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/b4/b47fcbd6d1d8f423efaa3a0d6cfc6b6a6c80dd0cb1e485f76bc0e29e1f34d679-git.status.stdout.log",
+          "sha256": "b47fcbd6d1d8f423efaa3a0d6cfc6b6a6c80dd0cb1e485f76bc0e29e1f34d679",
+          "bytes": 1535
+        },
+        {
+          "id": "9b415e4c-0b19-4b83-b52b-6af64e69e6bb",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/43/43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464-git.status.result.json",
+          "sha256": "43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464",
+          "bytes": 174
+        },
+        {
+          "id": "ecd96300-49c4-4856-9480-c9f9b3fb9bdc",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/cc/cc69efcaa326c9eb1c6c8d55c9060c96e09b7d3056865baf33454b0f11141ba2-tests.select.stdout.log",
+          "sha256": "cc69efcaa326c9eb1c6c8d55c9060c96e09b7d3056865baf33454b0f11141ba2",
+          "bytes": 2276
+        },
+        {
+          "id": "2eaadde8-2e35-4020-b789-bb3131d54199",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/24/24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7-tests.select.result.json",
+          "sha256": "24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7",
+          "bytes": 170
+        },
+        {
+          "id": "32f6e15f-ea74-42f0-92f1-800307cbeece",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/1b/1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87-quality.test.result.json",
+          "sha256": "1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87",
+          "bytes": 52
+        },
+        {
+          "id": "622d9092-3c76-4485-8cfd-c314c40b8303",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/9b/9b0f9f6ca70d4b254d0eadf15c1a9fb6ca91f867d3ffca3b28f890233ec01e7d-git.status.stdout.log",
+          "sha256": "9b0f9f6ca70d4b254d0eadf15c1a9fb6ca91f867d3ffca3b28f890233ec01e7d",
+          "bytes": 2348
+        },
+        {
+          "id": "e9c5f2d7-9c47-4bf0-b230-3cf7b5b89b98",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/58/581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee-quality.typecheck.result.json",
+          "sha256": "581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee",
+          "bytes": 57
+        },
+        {
+          "id": "adce40f2-3271-4b02-9814-3aa5318eaaef",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d4/d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492-security.secrets.result.json",
+          "sha256": "d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492",
+          "bytes": 138
+        },
+        {
+          "id": "65d93778-78ab-4107-a464-c54d9307a7f4",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench.ADKnvk/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3e/3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878-security.dependencies.result.json",
+          "sha256": "3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878",
+          "bytes": 127
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "modelAliases": {
+    "fable-5-1": "anthropic/fable-5.1 [reserved]",
+    "gemini-2-5": "google/gemini-2.5",
+    "gemini-2-5-flash": "google/gemini-2.5-flash",
+    "gemini-3-1-flash-lite": "google/gemini-3.1-flash-lite",
+    "gemini-3-1-pro-preview": "google/gemini-3.1-pro-preview [reserved]",
+    "gemini-3-5-flash": "google/gemini-3.5-flash",
+    "gemini-3-8": "google/gemini-3.8 [reserved]",
+    "gemini-3-8-flash": "google/gemini-3.8-flash [reserved]",
+    "gpt-5-4-mini": "openai/gpt-5.4-mini",
+    "gpt-5-5": "openai/gpt-5.5",
+    "gpt-5-6-luna": "openai/gpt-5.6-luna",
+    "gpt-5-6-sol": "openai/gpt-5.6-sol [reserved]",
+    "gpt-6-astra": "openai/gpt-6-astra [reserved]",
+    "haiku-4-5": "anthropic/haiku-4.5",
+    "opus-4-8": "anthropic/opus-4.8 [reserved]",
+    "sonnet-4-6": "anthropic/sonnet-4.6"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 0,
+      "totalTokens": 0,
+      "estimatedCostUsd": 0,
+      "latencyMs": 686,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 0,
+      "totalTokens": 4589,
+      "estimatedCostUsd": 0.0214834,
+      "latencyMs": 17586,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

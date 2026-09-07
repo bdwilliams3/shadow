@@ -11,8 +11,15 @@ export const StageNameSchema = z.enum([
 ]);
 export type StageName = z.infer<typeof StageNameSchema>;
 
-export const CapabilityTierSchema = z.enum(["frontier", "balanced", "economy"]);
-export type CapabilityTier = z.infer<typeof CapabilityTierSchema>;
+export const ModelAliasSchema = z.string().min(1);
+export type ModelAlias = z.infer<typeof ModelAliasSchema>;
+
+/**
+ * Historical name retained for persisted run compatibility. New configuration treats the
+ * value as a direct model alias, not as a capability tier.
+ */
+export const CapabilityTierSchema = ModelAliasSchema;
+export type CapabilityTier = ModelAlias;
 
 export const RunStateSchema = z.enum([
   "RECEIVED",
@@ -89,6 +96,8 @@ export type ToolCallRecord = z.infer<typeof ToolCallRecordSchema>;
 export const ModelCallRecordSchema = z.object({
   id: z.string().min(1),
   tier: CapabilityTierSchema,
+  modelAlias: ModelAliasSchema.optional(),
+  frontier: z.boolean().default(false),
   provider: z.string().min(1),
   model: z.string().min(1),
   status: z.enum(["completed", "blocked", "failed"]),
