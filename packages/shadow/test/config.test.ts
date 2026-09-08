@@ -22,6 +22,13 @@ describe("loadConfig", () => {
     expect(config.mcp.tests.enabled).toBe(true);
     expect(config.agents.chat).toBe("fable-5-1");
     expect(config.workspace.exclusions).toEqual([]);
+    expect(resolveModelAlias(config, "gpt-5-3-codex")).toMatchObject({
+      provider: "openai",
+      model: "gpt-5.3-codex",
+      maxOutputTokens: 6_000,
+      inputCostPerMillionTokens: 0.20,
+      outputCostPerMillionTokens: 1.20
+    });
   });
 
   it("merges repository config over defaults", async () => {

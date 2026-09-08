@@ -36,6 +36,13 @@ export const defaultConfig: ShadowConfig = {
           outputCostPerMillionTokens: 12.00,
           reservedBudget: false
         },
+        "gpt-5-3-codex": {
+          model: "gpt-5.3-codex",
+          maxOutputTokens: 6_000,
+          inputCostPerMillionTokens: 0.20,
+          outputCostPerMillionTokens: 1.20,
+          reservedBudget: false
+        },
         "gpt-5-4-mini": {
           model: "gpt-5.4-mini",
           maxOutputTokens: 3_000,
