@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "benchmarkId": "sspm-scale",
+  "baselineModel": "openai/gpt-5.5",
+  "shadowConfig": "plan=gpt-5.5,design=gpt-5.6-luna,develop=gpt-5.6-luna,test=gemini-2-5-flash,validate=gemini-3-1-pro-preview,deploy=gpt-5.6-luna,document=gemini-2-5-flash",
+  "workRoot": "/tmp/shadow-bench-clean-frontier",
+  "workspaces": [
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "baseline",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline",
+      "status": "completed",
+      "summary": "Added a defaulted, validated connector request-timeout setting to core configuration and exposed it on ProviderCreds for all providers.",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [
+        {
+          "id": "timeout-present",
+          "detail": "expected exit code 0, received 1: IndentationError: unexpected indent"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "bd0509f3-b92f-4490-ba59-37ff2c6ee4d8",
+          "kind": "baseline.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/04/04dcde8fad0bb42a602d8ec11f53d153b85dd15b58479577015bd8a1bafa3b3a-baseline.patch",
+          "sha256": "04dcde8fad0bb42a602d8ec11f53d153b85dd15b58479577015bd8a1bafa3b3a",
+          "bytes": 2891
+        },
+        {
+          "id": "cf91b8b7-f10d-46a7-9f90-13e2e0bed27b",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/57/57963c05f252a3cbb48caea72780c9a547334b408a12adb2825101d9faf344f1-patch.check.stdout.log",
+          "sha256": "57963c05f252a3cbb48caea72780c9a547334b408a12adb2825101d9faf344f1",
+          "bytes": 20
+        },
+        {
+          "id": "114b7143-776f-4399-8906-d9b747cce9e4",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "c46e7573-ca47-4001-866e-c3d6a107276e",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/baseline/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        }
+      ]
+    },
+    {
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "system": "shadow",
+      "workspaceRoot": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow",
+      "status": "COMPLETED",
+      "summary": "plan: Planned develop, test, validate. | develop: Applied patch affecting 1 files. Repaired: stray apply_patch markers removed from a unified diff; malformed hunk line counts recounted. | test: No test command is configured. | validate: Validation inspected 1 changed files; No typecheck command is configured. Secret scan inspected 29 files with no findings. No package.json dependency manifests were found.",
+      "changedFiles": [
+        "core/config.py"
+      ],
+      "failedChecks": [],
+      "artifacts": [
+        {
+          "id": "405f8969-d17a-4608-8e75-8014fa24d1e2",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/94/94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703-repository.inspect.stdout.log",
+          "sha256": "94744894e66b73e5574d8806c7876032b46e67df30fd35f988e050738d7ad703",
+          "bytes": 631
+        },
+        {
+          "id": "e72fc459-1546-44bb-939d-4d88726f557a",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/ed/eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555-repository.inspect.result.json",
+          "sha256": "eda57c7a9ff67f7d1eaa8da16e4b7058befa35915609de7f7c23191f3c750555",
+          "bytes": 1123
+        },
+        {
+          "id": "6f52b1a0-edd0-4407-9d75-25f4b5f37bff",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/86/86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21-git.status.stdout.log",
+          "sha256": "86c444635b71190f246eb1838e02cc088f0bf6d6ec6453aa6c91b51560e97e21",
+          "bytes": 289
+        },
+        {
+          "id": "729e7533-a0ed-4888-bede-f070de10dd15",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/a3/a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed-git.status.result.json",
+          "sha256": "a3750831a729b7ad5ffc4b148803ad9490584432d98aab2e4d4403820b0346ed",
+          "bytes": 81
+        },
+        {
+          "id": "761212b0-4af6-4462-ae5d-c2f987525a4e",
+          "kind": "plan.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/7a/7a82f6dda74d2a43662000ed36e682d278a2a071ffada9e80c9e1fc0012452e9-plan.result.json",
+          "sha256": "7a82f6dda74d2a43662000ed36e682d278a2a071ffada9e80c9e1fc0012452e9",
+          "bytes": 1016
+        },
+        {
+          "id": "960984a1-d498-45bc-a30a-5b8225c09934",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/91/91813df62daa7b8ffb1e94c43c0183fa3a39c24714b588b4b9600e4c41a8eb22-context.select.stdout.log",
+          "sha256": "91813df62daa7b8ffb1e94c43c0183fa3a39c24714b588b4b9600e4c41a8eb22",
+          "bytes": 1184
+        },
+        {
+          "id": "bcbad50b-d2c3-4238-a89f-560b77fc7880",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/99/997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72-context.select.result.json",
+          "sha256": "997f72c12c4c5e8715f6d45ea063590107b759e1debf48213e78b6c7f186ef72",
+          "bytes": 6801
+        },
+        {
+          "id": "bab5d909-69a9-40f2-8144-539a2095c1cd",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d7/d7d42b2d9a183147430aba228434883333b46c6e964045534d3f0d4f5e05dc0e-git.status.stdout.log",
+          "sha256": "d7d42b2d9a183147430aba228434883333b46c6e964045534d3f0d4f5e05dc0e",
+          "bytes": 849
+        },
+        {
+          "id": "1da63ce7-06dd-4c51-ba38-b9f21097b136",
+          "kind": "develop.patch",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/b8/b81c66b37d659001ae9ae55127eb8b0abc9b9d332f343cd6edf1048ca900c3c5-develop.patch",
+          "sha256": "b81c66b37d659001ae9ae55127eb8b0abc9b9d332f343cd6edf1048ca900c3c5",
+          "bytes": 2085
+        },
+        {
+          "id": "adf7d325-0c95-4f2c-a6c6-327938d7373e",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c1/c167d8a8b4143d91b3479ba3b45619e7ebe637f448a130ddda8f6cfd7b3a5e17-patch.check.stdout.log",
+          "sha256": "c167d8a8b4143d91b3479ba3b45619e7ebe637f448a130ddda8f6cfd7b3a5e17",
+          "bytes": 20
+        },
+        {
+          "id": "79ab89fc-ff5e-405c-9050-4f8635642c2a",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/c0/c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159-patch.check.result.json",
+          "sha256": "c0691c7d677fcc2bc255ab8d2e5650ff52e8ca2888f4e0e6159b3dc476977159",
+          "bytes": 129
+        },
+        {
+          "id": "3b57350b-6fda-466d-acf0-1c6c328ea331",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/77/77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7-context.verify.result.json",
+          "sha256": "77ed8011a82c96221a161a28d235b3584ab9b2773ff878a7b6674183287633f7",
+          "bytes": 40
+        },
+        {
+          "id": "9a23f512-b234-4134-8fda-977563565fa5",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/4e/4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c-patch.apply.result.json",
+          "sha256": "4ed5c3bbf4cd7a11d03e44947aa02374a722d04e9f29d964c0347b6ebb70325c",
+          "bytes": 128
+        },
+        {
+          "id": "9f1264b4-da7e-47eb-b411-00f0184c8ef5",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/73/7370673e1a0b70830c374209c40e71f68adf01f907442783985977d65404f4a1-git.status.stdout.log",
+          "sha256": "7370673e1a0b70830c374209c40e71f68adf01f907442783985977d65404f4a1",
+          "bytes": 1535
+        },
+        {
+          "id": "6894f574-3332-4948-a896-35e55f919b7d",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/43/43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464-git.status.result.json",
+          "sha256": "43f7d29df8dbf88251ff4f2a7022a5579bf6683d056441ae1f805211e3af8464",
+          "bytes": 174
+        },
+        {
+          "id": "eea9e9e1-1d75-42ac-8823-10992cbd5a05",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/21/21fd250dc1fa124205e7e3eb20341718cebd321a488ec7c043d5a2d0a0e0ed0f-tests.select.stdout.log",
+          "sha256": "21fd250dc1fa124205e7e3eb20341718cebd321a488ec7c043d5a2d0a0e0ed0f",
+          "bytes": 2276
+        },
+        {
+          "id": "9820a8d4-93ae-4b49-a48c-3612357b381b",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/24/24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7-tests.select.result.json",
+          "sha256": "24335ee58c15fb9d3d6383785620e1cd039aa047f63aa72098b8a2bdcdeaaab7",
+          "bytes": 170
+        },
+        {
+          "id": "3e02dbf2-72e5-4a8d-af85-ed3b13e95a12",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/1b/1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87-quality.test.result.json",
+          "sha256": "1bd74c146cb75352b99136e4dc9e0811b9aa23434cb9bbbc51b9c04d5a470d87",
+          "bytes": 52
+        },
+        {
+          "id": "f3fd382e-cef3-4150-b621-8deac7221d34",
+          "kind": "action.stdout",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/81/819a2887b6fcbf4d4f5535220e27fb9349cdf6b3b1d7e44b18e3d9cf5c545347-git.status.stdout.log",
+          "sha256": "819a2887b6fcbf4d4f5535220e27fb9349cdf6b3b1d7e44b18e3d9cf5c545347",
+          "bytes": 2348
+        },
+        {
+          "id": "82421d40-8528-471c-b19b-f889c6f3ccbc",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/58/581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee-quality.typecheck.result.json",
+          "sha256": "581f44374df0bcb9bfad0c73d1ad8ff4182161a767586743ca2af9fcf390bfee",
+          "bytes": 57
+        },
+        {
+          "id": "4154b058-474f-4a6c-8d95-af81a495040d",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/d4/d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492-security.secrets.result.json",
+          "sha256": "d4d01842d00cf952afba27c4fc3655faffc78269bfff630da7f5f09e88452492",
+          "bytes": 138
+        },
+        {
+          "id": "75532745-a957-4dde-b484-8f7e3963f4da",
+          "kind": "action.result",
+          "path": "/tmp/shadow-bench-clean-frontier/sspm-local-v1/config-default-timeout/shadow/.shadow/artifacts/3e/3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878-security.dependencies.result.json",
+          "sha256": "3ea8b83cb4116dd2582f8d8d0cfa2c907be174d77f35da6ebccafeeca971f878",
+          "bytes": 127
+        }
+      ]
+    }
+  ],
+  "fixtureRevisions": {
+    "sspm-local-v1": "/Users/ghost/Dev/sspm@95e092d374674d9bd7901f7d086afbd05c7f193b"
+  },
+  "modelAliases": {
+    "fable-5-1": "anthropic/fable-5.1 [reserved]",
+    "gemini-2-5": "google/gemini-2.5",
+    "gemini-2-5-flash": "google/gemini-2.5-flash",
+    "gemini-3-1-flash-lite": "google/gemini-3.1-flash-lite",
+    "gemini-3-1-pro-preview": "google/gemini-3.1-pro-preview [reserved]",
+    "gemini-3-5-flash": "google/gemini-3.5-flash",
+    "gemini-3-8": "google/gemini-3.8 [reserved]",
+    "gemini-3-8-flash": "google/gemini-3.8-flash [reserved]",
+    "gpt-5-4-mini": "openai/gpt-5.4-mini",
+    "gpt-5-5": "openai/gpt-5.5",
+    "gpt-5-6-luna": "openai/gpt-5.6-luna",
+    "gpt-5-6-sol": "openai/gpt-5.6-sol [reserved]",
+    "gpt-6-astra": "openai/gpt-6-astra [reserved]",
+    "haiku-4-5": "anthropic/haiku-4.5",
+    "opus-4-8": "anthropic/opus-4.8 [reserved]",
+    "sonnet-4-6": "anthropic/sonnet-4.6"
+  },
+  "observations": [
+    {
+      "system": "baseline",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": false,
+      "acceptanceCriteriaPassed": 0,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 26406,
+      "totalTokens": 26406,
+      "estimatedCostUsd": 0.074162,
+      "modelUsage": [
+        {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "modelAlias": "gpt-5-5",
+          "inputTokens": 24271,
+          "outputTokens": 2135,
+          "totalTokens": 26406,
+          "estimatedCostUsd": 0.074162
+        }
+      ],
+      "latencyMs": 20415,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 27,
+      "stageCount": 1,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    },
+    {
+      "system": "shadow",
+      "fixtureId": "sspm-local-v1",
+      "taskId": "config-default-timeout",
+      "succeeded": true,
+      "acceptanceCriteriaPassed": 1,
+      "acceptanceCriteriaTotal": 1,
+      "unevaluatedCriteria": 0,
+      "frontierTokens": 709,
+      "totalTokens": 4403,
+      "estimatedCostUsd": 0.004649800000000001,
+      "modelUsage": [
+        {
+          "inputTokens": 607,
+          "outputTokens": 102,
+          "estimatedCostUsd": 0.002438,
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "modelAlias": "gpt-5.5",
+          "totalTokens": 709
+        },
+        {
+          "inputTokens": 2221,
+          "outputTokens": 1473,
+          "estimatedCostUsd": 0.0022118000000000003,
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "modelAlias": "gpt-5.6-luna",
+          "totalTokens": 3694
+        }
+      ],
+      "latencyMs": 16604,
+      "humanInterventions": 0,
+      "dangerousActionsAttempted": 0,
+      "dangerousActionsRejected": 0,
+      "irrelevantFilesLoaded": 0,
+      "stageCount": 4,
+      "retries": 0,
+      "testRecoveriesAttempted": 0,
+      "testRecoveriesSucceeded": 0
+    }
+  ]
+}

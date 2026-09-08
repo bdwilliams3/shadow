@@ -93,6 +93,32 @@ describe("patch actions", () => {
     expect(await readFile(join(workspace, "hello.txt"), "utf8")).toBe("new\n");
   });
 
+  it("applies a unified diff with stray apply_patch markers", async () => {
+    const workspace = await gitWorkspace();
+    const hybrid = [
+      "*** Begin Patch",
+      "diff --git a/hello.txt b/hello.txt",
+      "--- a/hello.txt",
+      "+++ b/hello.txt",
+      "@@ -1 +1 @@",
+      "-old",
+      "+new",
+      "*** End Patch"
+    ].join("\n");
+
+    const checked = await runner(workspace).run<PatchResult>("patch.check", { patch: hybrid });
+    const applied = await runner(workspace).run<PatchResult>(
+      "patch.apply",
+      { patch: hybrid },
+      { allowWorkspaceWrites: true }
+    );
+
+    expect(checked.output).toMatchObject({ valid: true, changedFiles: ["hello.txt"] });
+    expect(checked.record.summary).toContain("stray apply_patch markers removed");
+    expect(applied.output?.applied).toBe(true);
+    expect(await readFile(join(workspace, "hello.txt"), "utf8")).toBe("new\n");
+  });
+
   it("reports the strict diagnostics when recounting cannot save the patch", async () => {
     const workspace = await gitWorkspace();
     const unmatched = [

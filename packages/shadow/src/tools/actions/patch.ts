@@ -87,7 +87,9 @@ interface PatchCheck {
   recounted: boolean;
   /** True when the input was an `apply_patch` envelope translated to a unified diff. */
   translated: boolean;
-  /** The diff Git actually saw. Differs from the input only when it was translated. */
+  /** True when bare apply_patch sentinels were removed from an otherwise unified diff. */
+  strippedEnvelopeMarkers: boolean;
+  /** The diff Git actually saw. Differs from the input only after deterministic normalization. */
   effectivePatch: string;
 }
 
@@ -106,6 +108,22 @@ function syntheticFailure(command: string[], message: string): ProcessResult {
  */
 function recountArgs(recounted: boolean): string[] {
   return recounted ? ["--recount"] : [];
+}
+
+function stripStrayEnvelopeMarkers(patch: string): { patch: string; stripped: boolean } {
+  if (!/^\s*diff --git /m.test(patch) || looksLikeApplyPatchFragment(patch)) {
+    return { patch, stripped: false };
+  }
+  const lines = patch.split("\n");
+  const stripped = lines.filter((line) => {
+    const marker = line.trim();
+    return marker !== "*** Begin Patch" && marker !== "*** End Patch";
+  });
+  if (stripped.length === lines.length) {
+    return { patch, stripped: false };
+  }
+  const cleaned = stripped.join("\n");
+  return { patch: cleaned.endsWith("\n") ? cleaned : `${cleaned}\n`, stripped: true };
 }
 
 async function checkPatch(
@@ -127,6 +145,7 @@ async function checkPatch(
     createdFiles: [],
     recounted: false,
     translated: false,
+    strippedEnvelopeMarkers: false,
     effectivePatch: rawPatch
   });
 
@@ -143,7 +162,11 @@ async function checkPatch(
     }
   };
 
-  const runGitChecks = async (patch: string, translated: boolean): Promise<PatchCheck> => {
+  const runGitChecks = async (
+    patch: string,
+    translated: boolean,
+    strippedEnvelopeMarkers = false
+  ): Promise<PatchCheck> => {
     const strict = await context.execute(checkCommand([]), { stdin: patch });
     let check = strict;
     let recounted = false;
@@ -157,6 +180,7 @@ async function checkPatch(
           createdFiles: [],
           recounted: false,
           translated,
+          strippedEnvelopeMarkers,
           effectivePatch: patch
         };
       }
@@ -183,11 +207,21 @@ async function checkPatch(
         createdFiles: [],
         recounted,
         translated,
+        strippedEnvelopeMarkers,
         effectivePatch: patch
       };
     }
     if (failed(summary)) {
-      return { check: summary, numstat, changedFiles, createdFiles: [], recounted, translated, effectivePatch: patch };
+      return {
+        check: summary,
+        numstat,
+        changedFiles,
+        createdFiles: [],
+        recounted,
+        translated,
+        strippedEnvelopeMarkers,
+        effectivePatch: patch
+      };
     }
     return {
       check,
@@ -196,9 +230,15 @@ async function checkPatch(
       createdFiles: parseCreatedFiles(summary.stdout),
       recounted,
       translated,
+      strippedEnvelopeMarkers,
       effectivePatch: patch
     };
   };
+
+  const unifiedDiff = stripStrayEnvelopeMarkers(rawPatch);
+  if (unifiedDiff.stripped) {
+    return runGitChecks(unifiedDiff.patch, false, true);
+  }
 
   // Frontier models emit OpenAI's `*** Begin Patch` envelope in place of a unified diff
   // often enough to lose whole tasks on format alone. Translating before Git sees it
@@ -221,9 +261,10 @@ async function checkPatch(
 }
 
 /** Describes any repair the actions had to perform, for the caller-visible summary. */
-function repairNote(result: Pick<PatchCheck, "recounted" | "translated">): string {
+function repairNote(result: Pick<PatchCheck, "recounted" | "translated" | "strippedEnvelopeMarkers">): string {
   const repairs = [
     result.translated ? "an apply_patch envelope translated to a unified diff" : "",
+    result.strippedEnvelopeMarkers ? "stray apply_patch markers removed from a unified diff" : "",
     result.recounted ? "malformed hunk line counts recounted" : ""
   ].filter(Boolean);
   return repairs.length > 0 ? ` Repaired: ${repairs.join("; ")}.` : "";
