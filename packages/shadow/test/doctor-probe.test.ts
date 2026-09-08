@@ -38,6 +38,7 @@ function configWith(models: Record<"primary" | "secondary" | "duplicate", string
   };
   config.models = {};
   config.agents = {
+    chat: "primary",
     plan: "primary",
     design: "secondary",
     develop: "duplicate",

@@ -148,6 +148,7 @@ export const defaultConfig: ShadowConfig = {
   },
   models: {},
   agents: {
+    chat: "fable-5-1",
     plan: "fable-5-1",
     design: "gemini-3-8",
     develop: "sonnet-4-6",

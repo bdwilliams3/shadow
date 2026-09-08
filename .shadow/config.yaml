@@ -103,6 +103,7 @@ providers:
         inputCostPerMillionTokens: 0.30
         outputCostPerMillionTokens: 2.50
 agents:
+  chat: gemini-3-1-pro-preview
   plan: gpt-5.5
   design: gpt-5.6-luna
   develop: gpt-5.6-luna

@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { ChatOrchestratorOutputSchema } from "../src/agents/chat-orchestrator-agent.js";
 import { OpenAICompatibleProvider, sanitizeStrictSchema } from "../src/models/openai-compatible.js";
 
 interface StubResult {
@@ -88,6 +89,17 @@ describe("sanitizeStrictSchema", () => {
   it("leaves a schema without unsupported keywords unchanged", () => {
     const plain = { type: "object", properties: { a: { type: "string" } }, required: ["a"] };
     expect(sanitizeStrictSchema(plain)).toEqual(plain);
+  });
+
+  it("keeps the chat coordinator schema valid for OpenAI strict output", () => {
+    const cleaned = sanitizeStrictSchema(z.toJSONSchema(ChatOrchestratorOutputSchema)) as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+
+    expect(cleaned.required).toEqual(Object.keys(cleaned.properties));
+    expect(cleaned.required).toContain("proposedObjective");
+    expect(JSON.stringify(cleaned.properties.proposedObjective)).toContain("null");
   });
 });
 

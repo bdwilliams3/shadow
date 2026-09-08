@@ -33,7 +33,16 @@ export const ProviderSchema = z.object({
   requestTimeoutMs: z.number().int().positive().default(120_000)
 });
 
-const AgentModelMappingSchema = z.record(StageNameSchema, AgentModelAliasSchema);
+const AgentModelMappingSchema = z.object({
+  chat: AgentModelAliasSchema,
+  plan: AgentModelAliasSchema,
+  design: AgentModelAliasSchema,
+  develop: AgentModelAliasSchema,
+  test: AgentModelAliasSchema,
+  validate: AgentModelAliasSchema,
+  deploy: AgentModelAliasSchema,
+  document: AgentModelAliasSchema
+});
 
 export const ApprovalPolicySchema = z.object({
   allowWorkspaceWrites: z.boolean().default(true),

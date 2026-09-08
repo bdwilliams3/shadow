@@ -20,6 +20,7 @@ describe("loadConfig", () => {
     expect(config.lifecycle.enabledStages).toContain("develop");
     expect(config.persistence.databasePath).toBe(".shadow/shadow.db");
     expect(config.mcp.tests.enabled).toBe(true);
+    expect(config.agents.chat).toBe("fable-5-1");
     expect(config.workspace.exclusions).toEqual([]);
   });
 

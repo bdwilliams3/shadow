@@ -21,6 +21,7 @@ This repository currently contains the first runnable vertical slice:
 - New-file creation in Develop, scoped by the create-mode entries Git reports rather than by model claims, and capped per attempt.
 - A bounded remediation loop that returns compact Test or Validate failure evidence to Develop for one configurable cycle.
 - A Develop decline path: an empty patch with a reason blocks the run instead of forcing the model to invent work it should refuse.
+- A bare `shadow` chat loop with concise repository preflight, configured stage/model visibility, compact run progress, local command parsing for slash or bare commands, one-token input guardrails, and a configurable read-only coordinator at `agents.chat` that decides `keep_thinking`, `change_directions`, or `start_coding`.
 - Stage tasks carry no boilerplate acceptance criteria; agents receive the user's request until a model-backed Plan stage can derive real per-task criteria.
 - Deterministic Plan, Test, and Validate agents that exchange compact structured evidence.
 - Schema-constrained Design and Document agents that consume hash-verified prior-stage artifacts.
@@ -50,6 +51,7 @@ npx pnpm@10.15.0 build
 ## Usage
 
 ```bash
+node packages/shadow/dist/cli/index.js
 node packages/shadow/dist/cli/index.js init
 node packages/shadow/dist/cli/index.js run "fix a typo" --dry-run
 node packages/shadow/dist/cli/index.js status
@@ -96,4 +98,4 @@ npx pnpm@10.15.0 build
 
 ## Next Implementation Slice
 
-The next slice should record a real baseline-versus-Shadow benchmark result against a configured provider, then add advisory-backed dependency vulnerability adapters and registered formatting and linting actions.
+The next slice should continue the `shadow` chatbox: make active runs interruptible from the same session, tighten first-run setup guidance around missing provider keys, and add a regression benchmark after the UX path is usable end to end.

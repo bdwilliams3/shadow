@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { Command } from "commander";
 import { ArtifactStore } from "../artifacts/store.js";
 import { executeBenchmark, formatBenchmarkExecution } from "../benchmarks/executor.js";
@@ -14,19 +15,85 @@ import {
   formatBenchmarkReport,
   formatBenchmarkSummary
 } from "../benchmarks/report.js";
-import { resolveModelAlias } from "../config/schema.js";
+import { ChatOrchestratorAgent } from "../agents/chat-orchestrator-agent.js";
 import { loadConfig, renderDefaultConfig, renderDefaultPolicy } from "../config/load.js";
 import { createConfiguredTestsExecutor } from "../mcp/tests/client.js";
 import { createConfiguredProviders } from "../models/factory.js";
-import { stageCallsModel } from "../orchestration/planner.js";
-import type { StageName } from "../orchestration/types.js";
+import { ModelRouter } from "../models/router.js";
 import type { ShadowConfig } from "../config/schema.js";
 import { probeModels } from "../models/probe.js";
 import { LifecycleOrchestrator } from "../orchestration/orchestrator.js";
 import type { Run } from "../orchestration/types.js";
 import { openSQLitePersistenceStore, type SQLitePersistenceStore } from "../persistence/sqlite-store.js";
+import type { PersistenceStore } from "../persistence/store.js";
 import { createDefaultActionRegistry } from "../tools/default-registry.js";
-import { formatRunSummary } from "./format.js";
+import {
+  formatProgressEvent,
+  formatRunBudget,
+  formatRunChangedFiles,
+  formatRunPlan,
+  formatRunSummary,
+  formatStageModelMap
+} from "./format.js";
+import { parseInteractiveInput } from "./interactive.js";
+import type { RunEvent } from "../orchestration/types.js";
+
+interface RunRequestOptions {
+  dryRun?: boolean;
+  json?: boolean;
+  onRunCreated?: (run: Run) => void;
+  onEvent?: (event: RunEvent) => void;
+}
+
+class ObservingStore implements PersistenceStore {
+  constructor(
+    private readonly delegate: SQLitePersistenceStore,
+    private readonly hooks: Pick<RunRequestOptions, "onRunCreated" | "onEvent">
+  ) {}
+
+  async createRun(run: Run): Promise<void> {
+    await this.delegate.createRun(run);
+    this.hooks.onRunCreated?.(run);
+  }
+
+  updateRun(run: Run): Promise<void> {
+    return this.delegate.updateRun(run);
+  }
+
+  getRun(runId: string): Promise<Run | undefined> {
+    return this.delegate.getRun(runId);
+  }
+
+  listRuns(): Promise<Run[]> {
+    return this.delegate.listRuns();
+  }
+
+  listEvents(runId: string): Promise<RunEvent[]> {
+    return this.delegate.listEvents(runId);
+  }
+
+  async appendEvent(
+    runId: string,
+    type: string,
+    payload: Record<string, unknown> = {}
+  ): Promise<RunEvent> {
+    const event = await this.delegate.appendEvent(runId, type, payload);
+    this.hooks.onEvent?.(event);
+    return event;
+  }
+
+  requestCancellation(runId: string): Promise<Run | undefined> {
+    return this.delegate.requestCancellation(runId);
+  }
+
+  resolveApproval(
+    runId: string,
+    approvalId: string | undefined,
+    decision: "approved" | "rejected"
+  ): Promise<Run | undefined> {
+    return this.delegate.resolveApproval(runId, approvalId, decision);
+  }
+}
 
 async function buildStore(workspaceRoot: string): Promise<SQLitePersistenceStore> {
   const { config } = await loadConfig(workspaceRoot);
@@ -44,13 +111,17 @@ function exitCodeForRun(run: Run): void {
   }
 }
 
-async function runRequest(request: string, options: { dryRun?: boolean; json?: boolean }): Promise<Run> {
+async function runRequest(request: string, options: RunRequestOptions): Promise<Run> {
   const workspaceRoot = process.cwd();
   const { config } = await loadConfig(workspaceRoot);
-  const store = await openSQLitePersistenceStore(
+  const sqliteStore = await openSQLitePersistenceStore(
     resolve(workspaceRoot, config.persistence.databasePath),
     resolve(workspaceRoot, config.persistence.runsDir)
   );
+  const store: PersistenceStore =
+    options.onRunCreated || options.onEvent
+      ? new ObservingStore(sqliteStore, options)
+      : sqliteStore;
   try {
     const orchestrator = new LifecycleOrchestrator(config, store);
     const run = await orchestrator.run({
@@ -66,7 +137,7 @@ async function runRequest(request: string, options: { dryRun?: boolean; json?: b
     console.log(formatRunSummary(run));
     return run;
   } finally {
-    store.close();
+    sqliteStore.close();
   }
 }
 
@@ -162,17 +233,13 @@ async function showStatus(runId?: string): Promise<void> {
 }
 
 async function showModels(): Promise<void> {
-  const { config, sources } = await loadConfig(process.cwd());
-  console.log(`Config sources: ${sources.length > 0 ? sources.join(", ") : "defaults"}`);
-  for (const [stage, alias] of Object.entries(config.agents)) {
-    const model = resolveModelAlias(config, alias);
-    // A tier mapped to a deterministic stage is inert. Saying so avoids the impression
-    // that changing it will move any tokens.
-    const note = stageCallsModel(stage as StageName) ? "" : "  (deterministic; no model call)";
-    const target = model ? `${model.provider}/${model.model}` : "unresolved";
-    const reserved = model?.frontier ? "  (reserved-budget accounting)" : "";
-    console.log(`${stage}: ${alias} -> ${target}${reserved}${note}`);
-  }
+  const workspaceRoot = process.cwd();
+  const { config, sources } = await loadConfig(workspaceRoot);
+  const configSummary = sources.length > 0
+    ? sources.map((source) => relative(workspaceRoot, source) || source).join(", ")
+    : "defaults";
+  console.log(`Config: ${configSummary}`);
+  console.log(formatStageModelMap(config));
 }
 
 async function showActions(options: { json?: boolean }): Promise<void> {
@@ -365,90 +432,318 @@ async function doctor(options: { probe?: boolean } = {}): Promise<void> {
 }
 
 async function commandWorks(command: string, args: string[]): Promise<boolean> {
-  const { execFile } = await import("node:child_process");
   return new Promise((resolveCommand) => {
     execFile(command, args, (error) => resolveCommand(!error));
   });
 }
 
-async function interactive(): Promise<void> {
-  console.log(
-    "Shadow interactive mode. Commands: /status, /plan, /budget, /diff, /approve, /reject, /cancel, /models, /actions, /exit."
+async function commandOutput(command: string, args: string[], cwd = process.cwd()): Promise<string | undefined> {
+  return new Promise((resolveCommand) => {
+    execFile(command, args, { cwd }, (error, stdout) => {
+      resolveCommand(error ? undefined : stdout.trim());
+    });
+  });
+}
+
+async function latestRun(runId?: string): Promise<Run | undefined> {
+  const store = await buildStore(process.cwd());
+  try {
+    return runId ? await store.getRun(runId) : (await store.listRuns())[0];
+  } finally {
+    store.close();
+  }
+}
+
+async function showRunPlan(runId?: string): Promise<void> {
+  const run = await latestRun(runId);
+  console.log(run ? formatRunPlan(run) : "No runs found.");
+}
+
+async function showRunBudget(runId?: string): Promise<void> {
+  const { config } = await loadConfig(process.cwd());
+  const run = await latestRun(runId);
+  console.log(run ? formatRunBudget(run, config) : `Run tokens: 0/${config.budgets.run.maxTotalTokens}`);
+}
+
+async function showRunDiff(runId?: string): Promise<void> {
+  const run = await latestRun(runId);
+  const recorded = run ? formatRunChangedFiles(run) : "No recorded file changes.";
+  const stat = await commandOutput("git", ["diff", "--stat"]);
+  console.log(stat ? `${recorded}\n\nWorkspace diff:\n${stat}` : recorded);
+}
+
+async function answerChat(message: string, steeringNotes: string[]): Promise<void> {
+  const workspaceRoot = process.cwd();
+  const { config } = await loadConfig(workspaceRoot);
+  const { providers, diagnostics } = createConfiguredProviders(config);
+  const agent = new ChatOrchestratorAgent(
+    new ModelRouter(config, providers),
+    config.agents.chat,
+    config.budgets.stage
   );
+  const context = await summarizeRepositoryForChat(message);
+  const result = await agent.run({
+    message,
+    workspaceRoot,
+    repositorySummary: context.summary,
+    ...(context.highestPriorityNextStep ? { highestPriorityNextStep: context.highestPriorityNextStep } : {}),
+    changedFileCount: context.changedFileCount,
+    steeringNotes
+  });
+  for (const diagnostic of diagnostics) {
+    console.log(diagnostic);
+  }
+  console.log(result.reply);
+  if (result.decision === "start_coding") {
+    console.log("I have not started coding yet. Say 'start coding' or give me the exact change when you want the lifecycle to run.");
+  }
+}
+
+async function summarizeRepositoryForChat(_message: string): Promise<{
+  summary: string;
+  highestPriorityNextStep?: string;
+  changedFileCount: number;
+}> {
+  const workspaceRoot = process.cwd();
+  const readme = await readTextIfExists(resolve(workspaceRoot, "README.md"));
+  const agents = await readTextIfExists(resolve(workspaceRoot, "AGENTS.md"));
+  const status = await commandOutput("git", ["status", "--short"]);
+  const repoDescription = firstMeaningfulParagraph(readme)
+    ?? "This looks like a local repository; I could not find a README summary.";
+  const nextStep = extractHighestPriorityNextStep(agents);
+  const changedFileCount = status ? status.split("\n").length : 0;
+  const lines = [
+    repoDescription,
+    `Current working tree changes: ${changedFileCount}.`
+  ];
+  if (agents) {
+    lines.push("AGENTS.md is present with repository-specific working instructions.");
+  }
+  if (nextStep) {
+    lines.push(`Highest-priority next step from AGENTS.md: ${nextStep}`);
+  }
+  return {
+    summary: lines.join("\n"),
+    ...(nextStep ? { highestPriorityNextStep: nextStep } : {}),
+    changedFileCount
+  };
+}
+
+async function readTextIfExists(path: string): Promise<string | undefined> {
+  if (!existsSync(path)) {
+    return undefined;
+  }
+  return readFile(path, "utf8");
+}
+
+function firstMeaningfulParagraph(text: string | undefined): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  return text
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.replace(/^# .*\n/u, "").trim())
+    .find((paragraph) => paragraph.length > 0);
+}
+
+function extractHighestPriorityNextStep(text: string | undefined): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  const section = text.split("### Highest-Priority Next Step")[1];
+  if (!section) {
+    return undefined;
+  }
+  return section
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !line.startsWith("#"))
+    ?.replace(/\s+/gu, " ");
+}
+
+function pendingApprovals(run: Run | undefined): string {
+  const approvals = run?.approvals.filter((approval) => approval.status === "pending") ?? [];
+  if (approvals.length === 0) {
+    return "No pending approvals.";
+  }
+  return approvals
+    .map((approval) =>
+      `${approval.id}: ${approval.operation} during ${approval.stage}` +
+      (approval.reasons.length > 0 ? `\n  ${approval.reasons.join("; ")}` : "")
+    )
+    .join("\n");
+}
+
+async function formatPreflight(): Promise<string> {
+  const workspaceRoot = process.cwd();
+  const { config, sources } = await loadConfig(workspaceRoot);
+  const gitRoot = await commandOutput("git", ["rev-parse", "--show-toplevel"]);
+  const branch = await commandOutput("git", ["branch", "--show-current"]);
+  const status = await commandOutput("git", ["status", "--short"]);
+  const providerEnv = [
+    ...new Set(
+      Object.values(config.providers)
+        .map((provider) => provider.apiKeyEnv)
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+  const missingKeys = providerEnv.filter((name) => !process.env[name]);
+  const tests = config.mcp.tests.enabled
+    ? createConfiguredTestsExecutor(config, workspaceRoot)
+    : undefined;
+  let testsStatus = config.mcp.tests.enabled ? "tests enabled" : "tests disabled";
+  if (tests) {
+    try {
+      const health = await tests.inspect();
+      testsStatus = `tests ${health.serverName}@${health.serverVersion}`;
+    } catch (error) {
+      testsStatus = `tests unavailable (${error instanceof Error ? error.message : String(error)})`;
+    }
+  } else if (config.mcp.tests.enabled) {
+    testsStatus = "tests unavailable";
+  }
+  const keyStatus = providerEnv.length === 0
+    ? "no provider keys configured"
+    : missingKeys.length === 0
+      ? "provider keys set"
+      : `missing ${missingKeys.join(", ")}`;
+  const modelSummary = [
+    `chat ${config.agents.chat}`,
+    `plan ${config.agents.plan}`,
+    `develop ${config.agents.develop}`,
+    `document ${config.agents.document}`
+  ].join(", ");
+  const configSummary = sources.length > 0
+    ? sources.map((source) => relative(workspaceRoot, source) || source).join(", ")
+    : "defaults";
+
+  return [
+    `Shadow ${workspaceRoot}`,
+    `${gitRoot ? branch || "git attached" : "no git"}; ${status ? `${status.split("\n").length} changed` : "clean"}; ${keyStatus}; ${testsStatus}`,
+    `${modelSummary}; budget ${config.budgets.run.maxTotalTokens} tokens, $${config.budgets.run.maxEstimatedCostUsd.toFixed(2)}; /models for all`,
+    `config ${configSummary}`,
+    "Type a full request, or help."
+  ].join("\n");
+}
+
+function printHelp(): void {
+  console.log([
+    "Commands:",
+    "  help                 Show this command list. Slash is optional.",
+    "  /status [run-id]     Show the current or latest run",
+    "  /plan [run-id]       Show selected stages and acceptance criteria",
+    "  /budget [run-id]     Show token and cost budget use",
+    "  /diff [run-id]       Show recorded changed files and git diff stat",
+    "  /approvals           List pending approvals",
+    "  /approve [id]        Approve the current run's first or named approval",
+    "  /reject [id]         Reject the current run's first or named approval",
+    "  /cancel              Cancel the current run if it is still active",
+    "  /models              Show configured stage aliases",
+    "  /actions             Show deterministic actions",
+    "  /preflight           Re-run readiness checks",
+    "  /exit                Leave Shadow"
+  ].join("\n"));
+}
+
+async function interactive(): Promise<void> {
+  console.log(await formatPreflight());
   const rl = createInterface({ input, output });
   let currentRunId: string | undefined;
+  const steeringNotes: string[] = [];
+  const lines = rl[Symbol.asyncIterator]();
   try {
     while (true) {
-      const line = (await rl.question("shadow> ")).trim();
+      output.write("shadow> ");
+      const next = await lines.next();
+      if (next.done) {
+        break;
+      }
+      const line = next.value.trim();
       if (line.length === 0) {
         continue;
       }
-      if (line === "/exit") {
-        break;
-      }
-      if (line === "/status") {
-        await showStatus(currentRunId);
+      const parsed = parseInteractiveInput(line);
+      if (parsed.kind === "empty") {
         continue;
       }
-      if (line === "/models") {
+      if (parsed.kind === "exit") {
+        break;
+      }
+      if (parsed.kind === "unknown") {
+        console.log(`Unknown command: ${parsed.command}. Try /help.`);
+        continue;
+      }
+      if (parsed.kind === "incomplete") {
+        console.log(parsed.message);
+        continue;
+      }
+      if (parsed.kind === "chat") {
+        await answerChat(parsed.message, steeringNotes);
+        continue;
+      }
+      if (parsed.kind === "command" && parsed.command === "help") {
+        printHelp();
+        continue;
+      }
+      if (parsed.kind === "command" && (parsed.command === "btw" || parsed.command === "steer")) {
+        const note = parsed.args.join(" ").trim();
+        if (note.length === 0) {
+          console.log("Add the steering note after the command, for example: /steer keep this as a read-only discussion.");
+        } else {
+          steeringNotes.push(note);
+          console.log(`Noted. Steering notes: ${steeringNotes.length}.`);
+        }
+        continue;
+      }
+      if (parsed.kind === "command" && parsed.command === "preflight") {
+        console.log(await formatPreflight());
+        continue;
+      }
+      if (parsed.kind === "command" && parsed.command === "status") {
+        await showStatus(parsed.args[0] ?? currentRunId);
+        continue;
+      }
+      if (parsed.kind === "command" && parsed.command === "models") {
         await showModels();
         continue;
       }
-      if (line === "/actions") {
+      if (parsed.kind === "command" && parsed.command === "actions") {
         await showActions({});
         continue;
       }
-      if (line === "/plan") {
-        const store = await buildStore(process.cwd());
-        try {
-          const run = currentRunId ? await store.getRun(currentRunId) : undefined;
-          console.log(run ? run.stageTasks.map((task) => task.stage).join(" -> ") : "No current run.");
-        } finally {
-          store.close();
-        }
+      if (parsed.kind === "command" && parsed.command === "plan") {
+        await showRunPlan(parsed.args[0] ?? currentRunId);
         continue;
       }
-      if (line === "/budget") {
-        const { config } = await loadConfig(process.cwd());
-        const store = await buildStore(process.cwd());
-        try {
-          const run = currentRunId ? await store.getRun(currentRunId) : undefined;
-          const used = run ? run.usage.inputTokens + run.usage.outputTokens : 0;
-          console.log(`Run tokens: ${used}/${config.budgets.run.maxTotalTokens}`);
-        } finally {
-          store.close();
-        }
+      if (parsed.kind === "command" && parsed.command === "budget") {
+        await showRunBudget(parsed.args[0] ?? currentRunId);
         continue;
       }
-      if (line === "/diff") {
-        const store = await buildStore(process.cwd());
-        try {
-          const run = currentRunId ? await store.getRun(currentRunId) : undefined;
-          const files = run
-            ? [...new Set(run.stageRuns.flatMap((stage) => stage.result?.changedFiles ?? []))]
-            : [];
-          console.log(files.length > 0 ? files.join("\n") : "No recorded file changes.");
-        } finally {
-          store.close();
-        }
+      if (parsed.kind === "command" && parsed.command === "diff") {
+        await showRunDiff(parsed.args[0] ?? currentRunId);
         continue;
       }
-      if (line === "/approve" || line === "/reject") {
+      if (parsed.kind === "command" && parsed.command === "approvals") {
+        console.log(pendingApprovals(await latestRun(currentRunId)));
+        continue;
+      }
+      if (parsed.kind === "command" && (parsed.command === "approve" || parsed.command === "reject")) {
         if (!currentRunId) {
           console.log("No current run.");
           continue;
         }
         const approved = await resolveRunApproval(
-          line === "/approve" ? "approved" : "rejected",
-          currentRunId
+          parsed.command === "approve" ? "approved" : "rejected",
+          currentRunId,
+          parsed.args[0]
         );
-        if (approved && line === "/approve") {
+        if (approved && parsed.command === "approve") {
           const resumed = await resumeRun(currentRunId, {});
           currentRunId = resumed.id;
         }
         continue;
       }
-      if (line === "/cancel") {
+      if (parsed.kind === "command" && parsed.command === "cancel") {
         if (currentRunId) {
           await cancelRun(currentRunId);
         } else {
@@ -456,7 +751,26 @@ async function interactive(): Promise<void> {
         }
         continue;
       }
-      const run = await runRequest(line, { dryRun: false });
+      if (parsed.kind !== "request") {
+        continue;
+      }
+      console.log("Starting run. Progress will stay compact; full records are in .shadow.");
+      const request = steeringNotes.length > 0
+        ? `${parsed.request}\n\nSteering notes:\n${steeringNotes.map((note) => `- ${note}`).join("\n")}`
+        : parsed.request;
+      const run = await runRequest(request, {
+        dryRun: false,
+        onRunCreated: (created) => {
+          currentRunId = created.id;
+          console.log(`run ${created.id}`);
+        },
+        onEvent: (event) => {
+          const formatted = formatProgressEvent(event);
+          if (formatted) {
+            console.log(`  ${formatted}`);
+          }
+        }
+      });
       currentRunId = run.id;
     }
   } finally {
